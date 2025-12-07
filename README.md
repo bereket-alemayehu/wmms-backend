@@ -3,23 +3,35 @@
 ## Overview
 The Wi-Fi Maintenance Management System (WMMS) is a backend application designed to manage Wi-Fi maintenance tasks efficiently. It provides functionalities for creating and updating maintenance tickets, tracking device statuses, and facilitating communication between users and maintenance personnel.
 
+## Prerequisites
+- Node.js (v18 or higher)
+- pnpm (v8 or higher)
+
+To install pnpm globally:
+```bash
+npm install -g pnpm
+```
+
 ## Project Structure
 ```
 wmms-backend
 ├── src
 │   ├── controllers
-│   │   └── maintenanceController.js
+│   │   └── maintenance.controller.ts
 │   ├── models
-│   │   └── deviceModel.js
+│   │   └── device.model.ts
 │   ├── routes
-│   │   └── maintenanceRoutes.js
+│   │   └── maintenance.routes.ts
 │   ├── services
-│   │   └── wifiService.js
+│   │   └── wifi.service.ts
 │   ├── utils
-│   │   └── helpers.js
-│   └── app.js
+│   │   └── helpers.ts
+│   └── app.ts
+├── dist
+│   └── (compiled JavaScript files)
 ├── package.json
-├── server.js
+├── tsconfig.json
+├── server.ts
 └── README.md
 ```
 
@@ -34,15 +46,36 @@ wmms-backend
    ```
 3. Install the dependencies:
    ```
-   npm install
+   pnpm install
    ```
 
 ## Usage
-1. Start the server:
+
+### Development
+1. Build the TypeScript project:
    ```
-   node server.js
+   pnpm run build
    ```
-2. The application will listen on the specified port (default is 3000). You can access the API endpoints for maintenance operations.
+2. Start the development server with hot reload:
+   ```
+   pnpm run dev
+   ```
+3. Or watch for TypeScript changes:
+   ```
+   pnpm run watch
+   ```
+
+### Production
+1. Build the project:
+   ```
+   pnpm run build
+   ```
+2. Start the server:
+   ```
+   pnpm start
+   ```
+
+The application will listen on the specified port (default is 3000). You can access the API endpoints for maintenance operations.
 
 ## API Endpoints
 - **Create Ticket**: `POST /api/maintenance/tickets`

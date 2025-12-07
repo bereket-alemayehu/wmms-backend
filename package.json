@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Wi-Fi Maintenance Management System backend",
   "main": "dist/server.js",
+  "packageManager": "pnpm@8.15.0",
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
