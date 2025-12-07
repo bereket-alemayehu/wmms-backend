@@ -1,12 +1,14 @@
-const express = require("express");
-require("dotenv").config();
-const mongoose = require("mongoose");
-const app = require("./src/app");
+import express from "express";
+import dotenv from "dotenv";
+import mongoose from "mongoose";
+import app from "./src/app";
+
+dotenv.config();
 
 const PORT = process.env.PORT || 3000;
 
 // MongoDB connection string
-const MONGO_URI =
+const MONGO_URI: string =
   process.env.MONGODB_URI ||
   "mongodb+srv://wmms-admin:wmms-admin@wmms.ek1cijz.mongodb.net/wmms?retryWrites=true&w=majority";
 
@@ -15,11 +17,11 @@ mongoose
   .connect(MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
-  })
+  } as mongoose.ConnectOptions)
   .then(() => {
     console.log("✅ Connected to MongoDB");
   })
-  .catch((err) => {
+  .catch((err: Error) => {
     console.error("❌ MongoDB connection error:", err);
   });
 
@@ -29,3 +31,4 @@ app.listen(PORT, () => {
     `🚀 Server is running on https://wifi-maintenance-system-wmms-backend.onrender.com`
   );
 });
+
