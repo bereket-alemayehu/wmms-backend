@@ -3,7 +3,6 @@ import { Error as MongooseError } from "mongoose";
 import { MongoServerError } from "mongodb";
 import { JsonWebTokenError, TokenExpiredError } from "jsonwebtoken";
 import { AppError } from "../utils/appError";
-import { send } from "process";
 
 const handleCastErrorDB = (error: MongooseError.CastError) => {
   const message = `Invalid ${error.path}: ${error.value}`;
@@ -11,9 +10,25 @@ const handleCastErrorDB = (error: MongooseError.CastError) => {
 };
 
 const handleDuplicateFieldsDB = (error: MongoServerError) => {
-  const match = error.errmsg.match(/(["'])(\\?.)*?\1/);
-  const value = match ? match[0] : "";
-  const message = `This value: ${value} has already been taken. Please use another value!`;
+  // MongoDB 7.x: Check for keyValue in error object, fallback to message parsing
+  const keyValue = (error as any).keyValue;
+  let value = "";
+
+  if (keyValue && typeof keyValue === "object") {
+    const keys = Object.keys(keyValue);
+    if (keys.length > 0) {
+      value = String(keyValue[keys[0]]);
+    }
+  } else {
+    // Fallback to parsing error message
+    const errorMessage = error.message || (error as any).errmsg || "";
+    const match = errorMessage.match(/(["'])(\\?.)*?\1/);
+    value = match ? match[0] : "";
+  }
+
+  const message = value
+    ? `This value: ${value} has already been taken. Please use another value!`
+    : "Duplicate field value. Please use another value!";
   return new AppError(message, 400);
 };
 
@@ -29,14 +44,20 @@ const handleJWTError = (error: Error) =>
 const handleJWTExpiredError = (error: Error) =>
   new AppError("Token has Expired. Please log in again", 401);
 
-const sendErrorDev = (error: Error | AppError, req: Request, res: Response) => {
-  if (error instanceof AppError)
-    return res.status(error.statusCode).json({
+const sendErrorDev = (
+  error: Error | AppError,
+  req: Request,
+  res: Response
+): void => {
+  if (error instanceof AppError) {
+    res.status(error.statusCode).json({
       status: error.status,
       message: error.message,
       stack: error.stack,
       error,
     });
+    return;
+  }
 
   res.status(500).json({
     status: "error",
@@ -46,15 +67,21 @@ const sendErrorDev = (error: Error | AppError, req: Request, res: Response) => {
   });
 };
 
-const sendErrorPro = (error: Error | AppError, req: Request, res: Response) => {
+const sendErrorPro = (
+  error: Error | AppError,
+  req: Request,
+  res: Response
+): void => {
   // console.log(error);
-  if (error instanceof AppError)
-    return res.status(error.statusCode).json({
+  if (error instanceof AppError) {
+    res.status(error.statusCode).json({
       status: error.status,
       message: error.message,
     });
+    return;
+  }
 
-  return res.status(500).json({
+  res.status(500).json({
     status: "error",
     message: "Something went wrong",
   });
