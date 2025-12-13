@@ -12,6 +12,8 @@ import userRouter from "./routes/user.routes";
 import officeRouter from "./routes/office.routes";
 import refundRouter from "./routes/refund.routes";
 import outageRouter from "./routes/outage.routes";
+import swaggerUI from "swagger-ui-express";
+import swaggerSpec from "./swagger";
 // import authRouter from "./routes/auth.routes";
 
 import globalErrorHandler from "./controllers/error.controller";
@@ -79,6 +81,7 @@ app.use(
     extended: true,
   })
 );
+app.use('/api-docs', swaggerUI.serve, swaggerUI.setup(swaggerSpec));
 
 // app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
