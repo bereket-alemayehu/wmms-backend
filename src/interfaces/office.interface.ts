@@ -8,3 +8,4 @@ export interface IOffice extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
+

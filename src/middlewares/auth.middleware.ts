@@ -1,4 +1,11 @@
-export const protectUser = catchAsync(
+import { NextFunction, Request, Response, RequestHandler } from "express";
+import { catchAsync } from "../utils/catchAsync";
+import { AppError } from "../utils/appError";
+import Jwt from "jsonwebtoken";
+import User from "../models/user.model";
+const promisify = require("util").promisify;
+
+export const protectUser: RequestHandler = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     let token;
     if (
@@ -45,7 +52,7 @@ export const protectUser = catchAsync(
   }
 );
 
-export const restrictTo = (...roles: string[]) =>
+export const restrictTo = (...roles: string[]): RequestHandler =>
   catchAsync(async (req: Request, res: Response, next: NextFunction) => {
     console.log(req.originalUrl, req.user);
     if (!roles.includes(req.user?.role ?? "")) {

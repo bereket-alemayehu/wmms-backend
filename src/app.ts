@@ -9,11 +9,10 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import mongoSanitize from "express-mongo-sanitize";
 // import authRouter from "./routes/auth.routes";
-// import userRouter from "./routes/user.routes";
-// import messageRouter from "./routes/message.routes";
-// import propertyRouter from "./routes/property.routes";
-// import notificationRouter from "./routes/notification.routes";
-// import propertyRequestRouter from "./routes/propertyRequest.routes";
+import userRouter from "./routes/user.routes";
+import officeRouter from "./routes/office.routes";
+import refundRouter from "./routes/refund.routes";
+import outageRouter from "./routes/outage.routes";
 
 import globalErrorHandler from "./controllers/error.controller";
 import { sanitizeInputs } from "./middlewares/middleware";
@@ -82,11 +81,10 @@ app.use(
 );
 
 // app.use("/api/v1/auth", authRouter);
-// app.use("/api/v1/users", userRouter);
-// app.use("/api/v1/messages", messageRouter);
-// app.use("/api/v1/properties", propertyRouter);
-// app.use("/api/v1/notifications", notificationRouter);
-// app.use("/api/v1/property-requests", propertyRequestRouter);
+app.use("/api/v1/users", userRouter);
+app.use("/api/v1/offices", officeRouter);
+app.use("/api/v1/refunds", refundRouter);
+app.use("/api/v1/outages", outageRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   console.log(req.originalUrl, "error");
