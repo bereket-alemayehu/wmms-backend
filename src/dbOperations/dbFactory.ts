@@ -2,7 +2,6 @@ import { Response, Request, NextFunction, RequestHandler } from "express";
 import { Document, Model, PopulateOptions } from "mongoose";
 import { AppError } from "../utils/appError";
 import { catchAsync } from "../utils/catchAsync";
-import Office from "../models/office.model";
 import APIFeatures from "../utils/apiFeatures";
 
 const getAll = <T extends Document>(

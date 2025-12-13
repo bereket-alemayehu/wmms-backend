@@ -8,11 +8,11 @@ import compression from "compression";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import mongoSanitize from "express-mongo-sanitize";
-// import authRouter from "./routes/auth.routes";
 import userRouter from "./routes/user.routes";
 import officeRouter from "./routes/office.routes";
 import refundRouter from "./routes/refund.routes";
 import outageRouter from "./routes/outage.routes";
+// import authRouter from "./routes/auth.routes";
 
 import globalErrorHandler from "./controllers/error.controller";
 import { sanitizeInputs } from "./middlewares/middleware";
