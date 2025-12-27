@@ -8,4 +8,5 @@ declare global {
   }
 }
 
-export {};
+// This empty export makes the file a module
+export { };
