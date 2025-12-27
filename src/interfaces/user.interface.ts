@@ -11,21 +11,50 @@ export interface IUser extends Document {
   // Common Fields
   fullName: string;
   phoneNumber: string;
+  email?: string;
   role: UserRole;
 
-  // Specific to Customer
-  serviceNumber?: string;
+  // Primary Authentication Identifier
+  serviceNumber: string;
+
+  // Password Authentication
+  password: string;
+  passwordConfirm?: string;
+  passwordChangedAt?: Date;
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
+
+  // Token Management
+  refreshToken?: string;
+
+  // Account Security
+  active: boolean;
+  accountLocked: boolean;
+  loginAttempts: number;
+  lockUntil?: Date;
+
+  // Specific to Customer (no longer needed as primary identifier)
+  // serviceNumber is now for all users
 
   // Specific to Staff (Supervisor/Technician)
   officeId?: Types.ObjectId;
 
-  // For Simulated Auth
+  // For Simulated Auth (backward compatibility)
   otp?: IOTP;
+  otpVerified: boolean;
+  isRegistrationComplete: boolean;
 
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
 
   // Methods
+  comparePassword: (candidatePassword: string) => Promise<boolean>;
   passwordChangedAfter: (JWTTimestamp: number) => boolean;
+  createPasswordResetToken: () => string;
+  incrementLoginAttempts: () => Promise<void>;
+  resetLoginAttempts: () => Promise<void>;
+  generateOTP: () => string;
+  verifyOTP: (candidateOTP: string) => boolean;
+  clearOTP: () => void;
 }
