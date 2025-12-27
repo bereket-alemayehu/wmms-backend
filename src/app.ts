@@ -14,7 +14,7 @@ import refundRouter from "./routes/refund.routes";
 import outageRouter from "./routes/outage.routes";
 import swaggerUI from "swagger-ui-express";
 import swaggerSpec from "./swagger";
-// import authRouter from "./routes/auth.routes";
+import authRouter from "./routes/auth.routes";
 
 import globalErrorHandler from "./controllers/error.controller";
 import { sanitizeInputs } from "./middlewares/middleware";
@@ -83,7 +83,7 @@ app.use(
 );
 app.use('/api-docs', swaggerUI.serve, swaggerUI.setup(swaggerSpec));
 
-// app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/offices", officeRouter);
 app.use("/api/v1/refunds", refundRouter);
