@@ -12,6 +12,7 @@ import userRouter from "./routes/user.routes";
 import officeRouter from "./routes/office.routes";
 import refundRouter from "./routes/refund.routes";
 import outageRouter from "./routes/outage.routes";
+import ticketRouter from "./routes/ticket.routes";
 import swaggerUI from "swagger-ui-express";
 import swaggerSpec from "./swagger";
 import authRouter from "./routes/auth.routes";
@@ -88,6 +89,7 @@ app.use("/api/v1/users", userRouter);
 app.use("/api/v1/offices", officeRouter);
 app.use("/api/v1/refunds", refundRouter);
 app.use("/api/v1/outages", outageRouter);
+app.use("/api/v1/tickets", ticketRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   console.log(req.originalUrl, "error");
