@@ -12,10 +12,9 @@ const officeSchema: Schema = new mongoose.Schema(
       required: true,
     },
     location: {
-      type: String, // e.g., "Bole, near Friendship Mall"
+      type: String,
       required: true,
     },
-    // Used for Queue Estimation Logic
     activeTechniciansCount: {
       type: Number,
       default: 5,
