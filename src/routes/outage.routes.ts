@@ -6,12 +6,27 @@ import {
   updateOutage,
   deleteOutage,
 } from "../controllers/outage.controller";
+import { protectUser, restrictTo } from "../middlewares/auth.middleware";
 
 const router: Router = Router();
 
-router.route("/").get(getAllOutages).post(createOutage);
+// All routes require authentication
+router.use(protectUser);
 
-router.route("/:id").get(getOutage).patch(updateOutage).delete(deleteOutage);
+// GET: All authenticated users
+// POST: Technician and above (create outage reports)
+// PATCH: Supervisor and above (update status)
+// DELETE: Manager only
+router
+  .route("/")
+  .get(getAllOutages)
+  .post(restrictTo("technician", "supervisor", "manager"), createOutage);
+
+router
+  .route("/:id")
+  .get(getOutage)
+  .patch(restrictTo("supervisor", "manager"), updateOutage)
+  .delete(restrictTo("manager"), deleteOutage);
 
 export default router;
 
