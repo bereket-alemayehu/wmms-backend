@@ -9,6 +9,7 @@
 export interface CustomerInfo {
     serviceNumber: string;
     phoneNumber: string;
+    email?: string;
     fullName?: string;
     address?: string;
     status: 'active' | 'suspended' | 'inactive';
@@ -62,6 +63,7 @@ export const getCustomerInfo = async (
     const mockData: CustomerInfo = {
         serviceNumber: serviceNumber.toUpperCase(),
         phoneNumber: generateMockPhoneNumber(serviceNumber),
+        email: generateMockEmail(serviceNumber),
         fullName: generateMockName(serviceNumber),
         address: 'Addis Ababa, Ethiopia',
         status: 'active',
@@ -118,6 +120,20 @@ const generateMockName = (serviceNumber: string): string => {
     const index = number % names.length;
 
     return names[index];
+};
+
+/**
+ * Generate mock email based on service number (for development)
+ */
+const generateMockEmail = (serviceNumber: string): string => {
+    // Extract number from service number
+    const match = serviceNumber.match(/\d+$/);
+    const number = match ? match[0] : '123456';
+    
+    // Generate email based on service number
+    const emailPrefix = `customer${number}`;
+    
+    return `${emailPrefix}@wmms.example.com`;
 };
 
 /**
