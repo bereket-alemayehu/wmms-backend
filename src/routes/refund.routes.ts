@@ -5,6 +5,7 @@ import {
   createRefund,
   updateRefund,
   deleteRefund,
+  scopeRefundListToUser,
 } from "../controllers/refund.controller";
 import { protectUser, restrictTo } from "../middlewares/auth.middleware";
 
@@ -19,7 +20,7 @@ router.use(protectUser);
 // DELETE: Manager only
 router
   .route("/")
-  .get(getAllRefunds)
+  .get(scopeRefundListToUser, getAllRefunds)
   .post(restrictTo("customer", "supervisor", "manager"), createRefund);
 
 router
