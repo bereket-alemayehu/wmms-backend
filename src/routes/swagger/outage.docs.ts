@@ -1,3 +1,62 @@
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Outage:
+ *       type: object
+ *       required:
+ *         - officeId
+ *         - title
+ *         - message
+ *       properties:
+ *         _id:
+ *           type: string
+ *           description: Unique identifier for the outage
+ *           example: "507f1f77bcf86cd799439011"
+ *         officeId:
+ *           type: string
+ *           description: Reference to the office
+ *           example: "507f1f77bcf86cd799439012"
+ *         postedBy:
+ *           type: string
+ *           description: Reference to the supervisor who posted the outage
+ *           example: "507f1f77bcf86cd799439013"
+ *         title:
+ *           type: string
+ *           description: Title of the outage
+ *           example: "Fiber Cut in Bole"
+ *         message:
+ *           type: string
+ *           description: Detailed message about the outage
+ *           example: "Major fiber cut affecting multiple areas"
+ *         affectedAreas:
+ *           type: array
+ *           items:
+ *             type: string
+ *           description: List of affected areas
+ *           example: ["Bole", "Kazanchis", "Megenagna"]
+ *         status:
+ *           type: string
+ *           enum: [Active, Resolved]
+ *           default: Active
+ *           description: Current status of the outage
+ *           example: "Active"
+ *         estimatedResolution:
+ *           type: string
+ *           format: date-time
+ *           description: Estimated time for resolution
+ *           example: "2024-01-15T18:00:00.000Z"
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Outage creation timestamp
+ *           example: "2024-01-15T10:30:00.000Z"
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Outage last update timestamp
+ *           example: "2024-01-15T14:30:00.000Z"
+ */
 
 /**
  * @swagger

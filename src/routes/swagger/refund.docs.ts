@@ -1,3 +1,47 @@
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Refund:
+ *       type: object
+ *       required:
+ *         - ticketId
+ *         - customerId
+ *         - amount
+ *       properties:
+ *         _id:
+ *           type: string
+ *           description: Unique identifier for the refund
+ *           example: "507f1f77bcf86cd799439011"
+ *         ticketId:
+ *           type: string
+ *           description: Reference to the ticket
+ *           example: "507f1f77bcf86cd799439012"
+ *         customerId:
+ *           type: string
+ *           description: Reference to the customer
+ *           example: "507f1f77bcf86cd799439013"
+ *         amount:
+ *           type: number
+ *           description: Refund amount
+ *           example: 500.00
+ *         status:
+ *           type: string
+ *           enum: [Requested, Approved, Rejected]
+ *           default: Requested
+ *           description: Current status of the refund
+ *           example: "Requested"
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Refund creation timestamp
+ *           example: "2024-01-15T10:30:00.000Z"
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Refund last update timestamp
+ *           example: "2024-01-15T14:30:00.000Z"
+ */
 
 /**
  * @swagger
