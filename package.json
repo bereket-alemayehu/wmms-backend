@@ -8,7 +8,10 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "nodemon --exec ts-node server.ts",
-    "watch": "tsc --watch"
+    "watch": "tsc --watch",
+    "seed": "ts-node src/seeders/index.ts",
+    "seed:offices": "ts-node src/seeders/office.seeder.ts",
+    "seed:users": "ts-node src/seeders/user.seeder.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
