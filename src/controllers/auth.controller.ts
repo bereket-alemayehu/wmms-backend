@@ -201,7 +201,7 @@ export const verifyOTP: RequestHandler = catchAsync(
 
         // Update user details
         if (email) user.email = email;
-        user.otpVerified = false; // Reset for future use
+        user.otpVerified = true;
         user.isRegistrationComplete = true; // Mark as fully registered
 
         await user.save({ validateBeforeSave: false });
