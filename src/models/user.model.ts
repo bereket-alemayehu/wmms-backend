@@ -113,6 +113,7 @@ const userSchema = new mongoose.Schema(
 // No need to define them explicitly with schema.index()
 
 // MIDDLEWARE: Hash password before saving
+
 userSchema.pre("save", async function () {
   // Only run if password was modified
   if (!this.isModified("password")) return;
