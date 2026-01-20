@@ -17,7 +17,7 @@ import {
     getPasswordFeedback,
     isValidEmail,
 } from "../utils/validation.utils";
-import { sendOTP, formatPhoneNumber } from "../utils/sms.utils";
+import { sendOTPEmail } from "../services/OTPEmail";
 import {
     verifyServiceNumber as ispVerifyServiceNumber,
     getCustomerInfo,
@@ -27,7 +27,7 @@ import {
 /**
  * STEP 1: INITIATE CUSTOMER SIGNUP
  * Customer provides service number
- * Backend verifies in ISP database, generates OTP, sends via SMS
+ * Backend verifies in ISP database, finds email, generates OTP, sends via email
  */
 export const initiateSignup: RequestHandler = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
@@ -111,21 +111,37 @@ export const initiateSignup: RequestHandler = catchAsync(
             );
         }
 
+        // Check if email exists in customer info
+        if (!customerInfo.email) {
+            return next(
+                new AppError("Email address not found for this service number. Please contact support.", 404)
+            );
+        }
+
+        // Validate email format from customer info
+        if (!isValidEmail(customerInfo.email)) {
+            return next(
+                new AppError("Invalid email address on file. Please contact support.", 400)
+            );
+        }
+
         // Create or update user (for OTP tracking)
         if (!user) {
             user = await User.create({
                 serviceNumber: upperServiceNumber,
                 phoneNumber: customerInfo.phoneNumber,
                 fullName: customerInfo.fullName || "Customer",
+                email: customerInfo.email.toLowerCase().trim(),
                 role: "customer",
                 password,
                 passwordConfirm,
                 isRegistrationComplete: false
             });
         } else {
-            // Update password for existing but non-completed registration
+            // Update password and email for existing but non-completed registration
             user.password = password;
             user.passwordConfirm = passwordConfirm;
+            user.email = customerInfo.email.toLowerCase().trim();
             await user.save();
         }
 
@@ -133,25 +149,25 @@ export const initiateSignup: RequestHandler = catchAsync(
         const otp = user.generateOTP();
         await user.save({ validateBeforeSave: false });
 
-        // Send OTP via SMS
-        const formattedPhone = formatPhoneNumber(customerInfo.phoneNumber);
-        const smsSent = await sendOTP(formattedPhone, otp);
+        // Send OTP via Email to the stored email address
+        const emailSent = await sendOTPEmail(user.email!, otp, user.fullName);
 
-        if (!smsSent) {
+        if (!emailSent) {
             return next(
-                new AppError("Failed to send OTP. Please try again later.", 500)
+                new AppError("Failed to send OTP email. Please try again later.", 500)
             );
         }
 
+        // Mask email for response
+        const emailParts = user.email!.split('@');
+        const maskedEmail = emailParts[0].substring(0, 2) + '***' + '@' + emailParts[1];
+
         res.status(200).json({
             status: "success",
-            message: `OTP sent to ${customerInfo.phoneNumber.replace(
-                /(\d{3})\d{4}(\d{3})/,
-                "$1****$2"
-            )}. Valid for 5 minutes.`,
+            message: `OTP sent to ${maskedEmail}. Valid for 5 minutes.`,
             data: {
                 fullName: customerInfo.fullName,
-                phoneNumber: customerInfo.phoneNumber.replace(/(\d{3})\d{4}(\d{3})/, "$1****$2")
+                email: maskedEmail
             }
         });
     }
@@ -159,12 +175,12 @@ export const initiateSignup: RequestHandler = catchAsync(
 
 /**
  * STEP 2: VERIFY OTP & COMPLETE SIGNUP
- * Customer enters OTP received via SMS
+ * Customer enters OTP received via email
  * Backend verifies OTP and completes registration
  */
 export const verifyOTP: RequestHandler = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
-        const { serviceNumber, otp, email } = req.body;
+        const { serviceNumber, otp } = req.body;
 
         // Validate required fields
         if (!serviceNumber || !otp) {
@@ -191,17 +207,9 @@ export const verifyOTP: RequestHandler = catchAsync(
             );
         }
 
-        // Validate email if provided
-        if (email && !isValidEmail(email)) {
-            return next(new AppError("Invalid email format", 400));
-        }
-
         // Mark OTP as verified and complete signup
         user.clearOTP();
-
-        // Update user details
-        if (email) user.email = email;
-        user.otpVerified = true;
+        user.otpVerified = false; // Reset for future use
         user.isRegistrationComplete = true; // Mark as fully registered
 
         await user.save({ validateBeforeSave: false });
