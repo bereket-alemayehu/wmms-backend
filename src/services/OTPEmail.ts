@@ -4,71 +4,29 @@ import { generateOTPEmailHTML, generateOTPEmailText, getOTPEmailSubject, OTPEmai
 
 dotenv.config();
 
-// Check if email credentials are configured
-const isEmailConfigured = () => {
-  return !!(
-    process.env.EMAIL_HOST &&
-    process.env.EMAIL_USER &&
-    process.env.EMAIL_PASS
-  );
-};
-
-// Create transporter only if credentials are available
-const createTransporter = () => {
-  if (!isEmailConfigured()) {
-    console.warn('⚠️  Email credentials not configured. Email sending will be logged to console.');
-    return null;
-  }
-
-  return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: parseInt(process.env.EMAIL_PORT || '465'),
-    secure: process.env.EMAIL_PORT === '465' || process.env.EMAIL_SECURE === 'true',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-    pool: true,
-    maxConnections: 5,
-    connectionTimeout: 10000,
-    socketTimeout: 10000,
-    tls: {
-      ciphers: 'SSLv3',
-      rejectUnauthorized: false, // Allow self-signed certificates
-    },
-    debug: process.env.NODE_ENV !== 'production',
-  });
-};
-
-const transporter = createTransporter();
+const transporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST,
+  port: parseInt(process.env.EMAIL_PORT || '587'),
+  secure: parseInt(process.env.EMAIL_PORT || '587') === 465, // true for 465, false for 587
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+  pool: true,
+  maxConnections: 5,
+  connectionTimeout: 30000, // Increased to 30 seconds
+  socketTimeout: 30000, // Increased to 30 seconds
+  tls: {
+    ciphers: 'SSLv3',
+  },
+  debug: process.env.NODE_ENV !== 'production',
+});
 
 export const sendMail = async (
   mailOptions: nodemailer.SendMailOptions
 ): Promise<nodemailer.SentMessageInfo> => {
-  // If email is not configured, log to console (development mode)
-  if (!transporter || !isEmailConfigured()) {
-    console.log('\n=== EMAIL (CONSOLE MODE - Email not configured) ===');
-    console.log('To:', mailOptions.to);
-    console.log('Subject:', mailOptions.subject);
-    if (mailOptions.text) {
-      console.log('Text:', mailOptions.text);
-    }
-    console.log('==================================================\n');
-    
-    // Return a mock success response
-    return {
-      messageId: `console-${Date.now()}`,
-      accepted: [mailOptions.to as string],
-      rejected: [],
-      pending: [],
-      response: '250 Message accepted (console mode)',
-    } as nodemailer.SentMessageInfo;
-  }
-
   try {
-    // Verify connection before sending
     await transporter.verify();
-    console.log('✅ SMTP connection verified');
 
     if (process.env.NODE_ENV !== 'production') {
       console.log('Sending email to:', mailOptions.to);
@@ -76,17 +34,23 @@ export const sendMail = async (
     }
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Email sent successfully:', info.messageId);
+    console.log('Email sent:', info.messageId);
     return info;
   } catch (error) {
-    console.error('❌ Error sending email:', error);
+    console.error('Error sending email:', error);
     
     // Provide more helpful error messages
     if (error instanceof Error) {
-      if (error.message.includes('Missing credentials')) {
-        throw new Error('Email credentials are missing. Please check EMAIL_USER and EMAIL_PASS in .env file');
+      if (error.message.includes('ETIMEDOUT') || error.message.includes('Connection timeout')) {
+        throw new Error(
+          `Connection timeout to SMTP server. Please check:\n` +
+          `- EMAIL_HOST: ${process.env.EMAIL_HOST}\n` +
+          `- EMAIL_PORT: ${process.env.EMAIL_PORT || '587'}\n` +
+          `- Network connectivity and firewall settings\n` +
+          `- If running on a server, ensure outbound SMTP ports are open`
+        );
       } else if (error.message.includes('ECONNREFUSED')) {
-        throw new Error(`Cannot connect to SMTP server. Please check EMAIL_HOST (${process.env.EMAIL_HOST}) and EMAIL_PORT in .env file`);
+        throw new Error(`Connection refused. Check EMAIL_HOST (${process.env.EMAIL_HOST}) and EMAIL_PORT`);
       } else if (error.message.includes('EAUTH')) {
         throw new Error('Email authentication failed. Please check EMAIL_USER and EMAIL_PASS credentials');
       }
@@ -128,9 +92,6 @@ export const sendOTPEmail = async (
 
 process.on('SIGINT', () => {
   console.log('Shutting down mail transporter...');
-  if (transporter) {
-    transporter.close();
-  }
+  transporter.close();
   process.exit(0);
 });
-
