@@ -29,9 +29,6 @@ export interface IUser extends Document {
 
   // Account Security
   active: boolean;
-  accountLocked: boolean;
-  loginAttempts: number;
-  lockUntil?: Date;
 
   // Specific to Customer (no longer needed as primary identifier)
   // serviceNumber is now for all users
@@ -52,8 +49,6 @@ export interface IUser extends Document {
   comparePassword: (candidatePassword: string) => Promise<boolean>;
   passwordChangedAfter: (JWTTimestamp: number) => boolean;
   createPasswordResetToken: () => string;
-  incrementLoginAttempts: () => Promise<void>;
-  resetLoginAttempts: () => Promise<void>;
   generateOTP: () => string;
   verifyOTP: (candidateOTP: string) => boolean;
   clearOTP: () => void;

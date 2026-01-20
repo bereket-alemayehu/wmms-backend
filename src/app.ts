@@ -68,13 +68,14 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.use(sanitizeInputs);
 app.use(compression());
 
-const limiter = rateLimit({
-  max: 100000,
-  windowMs: 60 * 60 * 1000,
-  message: "Too many request! Try again after an hour",
-});
+// const limiter = rateLimit({
+//   max: 100000,
+//   windowMs: 60 * 60 * 1000,
+//   message: "Too many request! Try again after an hour",
+// });
 
-app.use(limiter);
+// app.use(limiter);
+
 app.use(cookieParser());
 app.use(
   express.urlencoded({

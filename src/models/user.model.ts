@@ -85,17 +85,6 @@ const userSchema = new mongoose.Schema(
       default: true,
       select: false,
     },
-    accountLocked: {
-      type: Boolean,
-      default: false,
-    },
-    loginAttempts: {
-      type: Number,
-      default: 0,
-    },
-    lockUntil: {
-      type: Date,
-    },
 
     // Specific to Staff (Supervisor/Technician)
     officeId: {
@@ -186,39 +175,6 @@ userSchema.methods.createPasswordResetToken = function (): string {
 
   // Return plain text token (to be sent to user)
   return resetToken;
-};
-
-// INSTANCE METHOD: Increment login attempts
-userSchema.methods.incrementLoginAttempts = async function (): Promise<void> {
-  // If lock has expired, reset attempts
-  if (this.lockUntil && this.lockUntil < new Date()) {
-    await this.updateOne({
-      $set: { loginAttempts: 1 },
-      $unset: { lockUntil: 1 },
-    });
-    return;
-  }
-
-  // Otherwise increment attempts
-  const updates: any = { $inc: { loginAttempts: 1 } };
-
-  // Lock account after 5 failed attempts (lock for 1 hour)
-  if (this.loginAttempts + 1 >= 5 && !this.accountLocked) {
-    updates.$set = {
-      accountLocked: true,
-      lockUntil: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
-    };
-  }
-
-  await this.updateOne(updates);
-};
-
-// INSTANCE METHOD: Reset login attempts
-userSchema.methods.resetLoginAttempts = async function (): Promise<void> {
-  await this.updateOne({
-    $set: { loginAttempts: 0, accountLocked: false },
-    $unset: { lockUntil: 1 },
-  });
 };
 
 // INSTANCE METHOD: Generate OTP for signup/password reset
