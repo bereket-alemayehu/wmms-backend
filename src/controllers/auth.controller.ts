@@ -210,10 +210,6 @@ export const verifyOTP: RequestHandler = catchAsync(
         // Mark OTP as verified and complete signup
         user.clearOTP();
         user.otpVerified = false; // Reset for future use
-
-        // Update user details
-        if (email) user.email = email;
-        user.otpVerified = true;
         user.isRegistrationComplete = true; // Mark as fully registered
 
         await user.save({ validateBeforeSave: false });
