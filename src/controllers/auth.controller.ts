@@ -230,7 +230,7 @@ export const login: RequestHandler = catchAsync(
         // Find user and include password field
         const user = await User.findOne({
             serviceNumber: serviceNumber.toUpperCase(),
-        }).select("+password +loginAttempts +accountLocked +lockUntil");
+        }).select("+password");
 
         if (!user) {
             return next(new AppError("Invalid service number or password", 401));
@@ -246,35 +246,12 @@ export const login: RequestHandler = catchAsync(
             );
         }
 
-        // Check if account is locked
-        if (user.accountLocked) {
-            if (user.lockUntil && user.lockUntil > new Date()) {
-                const minutesLeft = Math.ceil(
-                    (user.lockUntil.getTime() - Date.now()) / 60000
-                );
-                return next(
-                    new AppError(
-                        `Account is locked due to multiple failed login attempts. Try again in ${minutesLeft} minutes`,
-                        423
-                    )
-                );
-            } else {
-                // Lock expired, reset
-                await user.resetLoginAttempts();
-            }
-        }
-
         // Verify password
         const isPasswordCorrect = await user.comparePassword(password);
 
         if (!isPasswordCorrect) {
-            // Increment login attempts
-            await user.incrementLoginAttempts();
             return next(new AppError("Invalid service number or password", 401));
         }
-
-        // Reset login attempts on successful login
-        await user.resetLoginAttempts();
 
         // Update refresh token in database
         const refreshToken = signRefreshToken(user._id);

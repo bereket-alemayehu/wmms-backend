@@ -44,25 +44,13 @@ export const protectUser: RequestHandler = catchAsync(
 
     // Check if user still exists
     const user = await User.findById(decoded.id).select(
-      "+passwordChangedAt +accountLocked +lockUntil"
+      "+passwordChangedAt"
     );
 
     if (!user) {
       return next(
         new AppError("The user belonging to this token no longer exists", 401)
       );
-    }
-
-    // Check if account is locked
-    if (user.accountLocked) {
-      if (user.lockUntil && user.lockUntil > new Date()) {
-        return next(
-          new AppError("Your account is locked. Please contact support", 423)
-        );
-      } else {
-        // Lock expired, reset
-        await user.resetLoginAttempts();
-      }
     }
 
     // Check if user changed password after token was issued
