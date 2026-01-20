@@ -16,13 +16,62 @@ export interface CustomerInfo {
     accountType: 'prepaid' | 'postpaid';
 }
 
+// Mock customer database
+const mockCustomers: CustomerInfo[] = [
+    {
+        serviceNumber: 'WMMS-CUST-100001',
+        phoneNumber: '+251912345678',
+        email: 'estifk2@gmail.com',
+        fullName: 'Abebe Kebede',
+        address: 'Addis Ababa, Ethiopia',
+        status: 'active',
+        accountType: 'postpaid',
+    },
+    {
+        serviceNumber: 'WMMS-CUST-100002',
+        phoneNumber: '+251923456789',
+        email: 'estifanosk3@gmail.com',
+        fullName: 'Tigist Haile',
+        address: 'Addis Ababa, Ethiopia',
+        status: 'active',
+        accountType: 'postpaid',
+    },
+    {
+        serviceNumber: 'WMMS-CUST-100003',
+        phoneNumber: '+251934567890',
+        email: 'bereketalemayehuf@gmail.com',
+        fullName: 'Dawit Gebru',
+        address: 'Addis Ababa, Ethiopia',
+        status: 'active',
+        accountType: 'prepaid',
+    },
+    {
+        serviceNumber: 'WMMS-CUST-100004',
+        phoneNumber: '+251945678901',
+        email: 'bereketalemayehuf@gmail.com',
+        fullName: 'Meron Tadesse',
+        address: 'Addis Ababa, Ethiopia',
+        status: 'active',
+        accountType: 'postpaid',
+    },
+    {
+        serviceNumber: 'WMMS-CUST-100005',
+        phoneNumber: '+251956789012',
+        email: 'bereketalemayehuf@gmail.com',
+        fullName: 'Solomon Alemu',
+        address: 'Addis Ababa, Ethiopia',
+        status: 'active',
+        accountType: 'postpaid',
+    },
+];
+
 /**
  * Verify if a service number exists in the ISP database
  */
 export const verifyServiceNumber = async (
     serviceNumber: string
 ): Promise<boolean> => {
-    // Development mode - validate format
+    // First validate format
     const pattern = /^WMMS-CUST-\d+$/i;
 
     if (!pattern.test(serviceNumber)) {
@@ -36,8 +85,13 @@ export const verifyServiceNumber = async (
     // );
     // return result.length > 0;
 
-    // Mock: Accept any valid format
-    return true;
+    // Check if service number exists in mock database
+    const upperServiceNumber = serviceNumber.toUpperCase();
+    const exists = mockCustomers.some(
+        (c) => c.serviceNumber.toUpperCase() === upperServiceNumber
+    );
+
+    return exists;
 };
 
 /**
@@ -46,10 +100,10 @@ export const verifyServiceNumber = async (
 export const getCustomerInfo = async (
     serviceNumber: string
 ): Promise<CustomerInfo | null> => {
-    // Verify service number exists
-    const exists = await verifyServiceNumber(serviceNumber);
+    // Verify service number format
+    const isValidFormat = await verifyServiceNumber(serviceNumber);
 
-    if (!exists) {
+    if (!isValidFormat) {
         return null;
     }
 
@@ -59,18 +113,18 @@ export const getCustomerInfo = async (
     //   [serviceNumber]
     // );
 
-    // Mock data for development
-    const mockData: CustomerInfo = {
-        serviceNumber: serviceNumber.toUpperCase(),
-        phoneNumber: generateMockPhoneNumber(serviceNumber),
-        email: generateMockEmail(serviceNumber),
-        fullName: generateMockName(serviceNumber),
-        address: 'Addis Ababa, Ethiopia',
-        status: 'active',
-        accountType: 'postpaid',
-    };
+    // Find customer in mock database by service number
+    const upperServiceNumber = serviceNumber.toUpperCase();
+    const customer = mockCustomers.find(
+        (c) => c.serviceNumber.toUpperCase() === upperServiceNumber
+    );
 
-    return mockData;
+    if (customer) {
+        return { ...customer }; // Return a copy
+    }
+
+    // Service number not found in database
+    return null;
 };
 
 /**
@@ -89,7 +143,7 @@ export const isCustomerActive = async (
 };
 
 /**
- * Generate mock phone number based on service number (for development)
+ * Generate mock phone number based on service number (for development fallback)
  */
 const generateMockPhoneNumber = (serviceNumber: string): string => {
     // Extract number from service number
@@ -103,7 +157,7 @@ const generateMockPhoneNumber = (serviceNumber: string): string => {
 };
 
 /**
- * Generate mock customer name (for development)
+ * Generate mock customer name (for development fallback)
  */
 const generateMockName = (serviceNumber: string): string => {
     const names = [
@@ -123,7 +177,7 @@ const generateMockName = (serviceNumber: string): string => {
 };
 
 /**
- * Generate mock email based on service number (for development)
+ * Generate mock email based on service number (for development fallback)
  */
 const generateMockEmail = (serviceNumber: string): string => {
     // Extract number from service number
