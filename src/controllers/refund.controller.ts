@@ -15,18 +15,17 @@ export const getAllRefunds: RequestHandler = catchAsync(
 
     let filter: any = {};
 
-    // Role-based filtering
+    // Role-based filtering (restricted to customer and manager only)
     if (req.user.role === "customer") {
       // Customers see only their own refunds
       filter.customerId = req.user._id;
     } else if (req.user.role === "manager") {
-      // Managers see only refunds from their office
+      // Managers see only refunds from their office (highest role for refund access)
       if (!req.user.officeId) {
         return next(new AppError("Manager does not have an assigned office", 400));
       }
       filter.officeId = req.user.officeId;
     }
-    // Supervisors and above can see all refunds (no filter)
 
     // Build query with filters
     const features = new APIFeatures(Refund.find(filter), req.query)
