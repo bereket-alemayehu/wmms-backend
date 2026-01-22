@@ -54,9 +54,9 @@ router.patch(
 
 // Custom routes: Filtered views
 router.get("/customer/my-tickets", getCustomerTickets);
-router.get("/office/:officeId/tickets", getOfficeTickets);
-router.get("/technician/my-tickets", getTechnicianTickets);
-router.get("/office/:officeId/statistics", getOfficeQueueStatistics);
+router.get("/office/tickets", restrictTo("supervisor", "manager"), getOfficeTickets);
+router.get("/technician/my-tickets", restrictTo("technician"), getTechnicianTickets);
+router.get("/office/statistics", restrictTo("supervisor", "manager"), getOfficeQueueStatistics);
 
 // Custom routes: Feedback and Refunds
 router.post("/:id/feedback", submitTicketFeedback);

@@ -95,7 +95,7 @@ export const seedUsers = async (): Promise<void> => {
       },
     ];
 
-    // Technicians (need officeId)
+    // Technicians (all assigned to Bole Office for testing)
     const technicians = [
       {
         fullName: "Tech User One",
@@ -127,7 +127,7 @@ export const seedUsers = async (): Promise<void> => {
         email: "tech3@example.com",
         serviceNumber: "WMMS-TECH-000003",
         role: "technician",
-        officeId: kazanchisOffice?._id,
+        officeId: boleOffice?._id,
         password: DEFAULT_PASSWORD,
         isRegistrationComplete: true,
         otpVerified: true,
@@ -139,7 +139,7 @@ export const seedUsers = async (): Promise<void> => {
         email: "tech4@example.com",
         serviceNumber: "WMMS-TECH-000004",
         role: "technician",
-        officeId: megenagnaOffice?._id,
+        officeId: boleOffice?._id,
         password: DEFAULT_PASSWORD,
         isRegistrationComplete: true,
         otpVerified: true,
@@ -147,7 +147,7 @@ export const seedUsers = async (): Promise<void> => {
       },
     ];
 
-    // Supervisors (need officeId)
+    // Supervisors (all assigned to Bole Office for testing)
     const supervisors = [
       {
         fullName: "Supervisor One",
@@ -167,7 +167,7 @@ export const seedUsers = async (): Promise<void> => {
         email: "supervisor2@example.com",
         serviceNumber: "WMMS-SUP-000002",
         role: "supervisor",
-        officeId: kazanchisOffice?._id,
+        officeId: boleOffice?._id,
         password: DEFAULT_PASSWORD,
         isRegistrationComplete: true,
         otpVerified: true,
@@ -175,7 +175,7 @@ export const seedUsers = async (): Promise<void> => {
       },
     ];
 
-    // Managers (need officeId)
+    // Managers (all assigned to Bole Office for testing)
     const managers = [
       {
         fullName: "Manager One",
