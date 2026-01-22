@@ -32,7 +32,7 @@ export const protectUser: RequestHandler = catchAsync(
     // Verify token
     let decoded;
     try {
-      decoded = await verifyToken(token, false);
+      decoded = await verifyToken(token);
     } catch (err: any) {
       if (err.name === "TokenExpiredError") {
         return next(
@@ -104,7 +104,7 @@ export const isLoggedIn: RequestHandler = catchAsync(
     }
 
     try {
-      const decoded = await verifyToken(token, false);
+      const decoded = await verifyToken(token);
       const user = await User.findById(decoded.id);
 
       if (user && !user.passwordChangedAfter(decoded.iat)) {
@@ -118,33 +118,3 @@ export const isLoggedIn: RequestHandler = catchAsync(
   }
 );
 
-/**
- * Verify refresh token
- */
-export const verifyRefreshToken: RequestHandler = catchAsync(
-  async (req: Request, res: Response, next: NextFunction) => {
-    let refreshToken = req.cookies.refreshToken;
-
-    if (!refreshToken) {
-      return next(new AppError("Refresh token not provided", 401));
-    }
-
-    try {
-      const decoded = await verifyToken(refreshToken, true);
-      const user = await User.findById(decoded.id).select("+refreshToken");
-
-      if (!user) {
-        return next(new AppError("User no longer exists", 401));
-      }
-
-      if (user.refreshToken !== refreshToken) {
-        return next(new AppError("Invalid refresh token", 401));
-      }
-
-      req.user = user;
-      next();
-    } catch (err) {
-      return next(new AppError("Invalid or expired refresh token", 401));
-    }
-  }
-);
