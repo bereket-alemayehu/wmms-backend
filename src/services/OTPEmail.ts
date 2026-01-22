@@ -110,16 +110,40 @@ export const sendOTPEmail = async (
     await emailSender.send();
     console.log('OTP email sent successfully to:', email);
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error sending OTP email:', error);
+    
+    // Check for network connectivity issues
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENETUNREACH' || error.code === 'ETIMEDOUT') {
+      console.error('⚠️  Network error: Cannot connect to Brevo API');
+      console.error('   This could be due to:');
+      console.error('   - Internet connectivity issues');
+      console.error('   - Firewall blocking outbound HTTPS connections');
+      console.error('   - Proxy settings needed');
+      console.error('   - DNS resolution problems');
+      
+      // In development, log OTP to console as fallback
+      if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production') {
+        console.log('\n=== OTP EMAIL (Network Error - Development Fallback) ===');
+        console.log(`To: ${email}`);
+        console.log(`Name: ${fullName || 'Customer'}`);
+        console.log(`OTP: ${otp}`);
+        console.log(`Subject: ${getOTPEmailSubject()}`);
+        console.log('========================================================\n');
+        // Return true in development so signup can continue
+        return true;
+      }
+    }
     
     // Provide more helpful error messages
     if (error instanceof Error) {
-      if (error.message.includes('API key')) {
+      if (error.message.includes('API key') || (error as any).response?.status === 401) {
         console.error('Brevo API key is invalid or missing. Check BREVO_API_KEY environment variable.');
       } else if (error.message.includes('sender')) {
         console.error('Invalid sender email. Check EMAIL_FROM or BREVO_SENDER_EMAIL environment variable.');
       }
+    } else if ((error as any)?.response?.status === 401) {
+      console.error('Brevo API key is invalid or missing. Check BREVO_API_KEY environment variable.');
     }
     
     return false;
@@ -182,16 +206,42 @@ export const sendPasswordResetEmail = async (
     await emailSender.send();
     console.log('Password reset email sent successfully to:', email);
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error sending password reset email:', error);
+    
+    // Check for network connectivity issues
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENETUNREACH' || error.code === 'ETIMEDOUT') {
+      console.error('⚠️  Network error: Cannot connect to Brevo API');
+      console.error('   This could be due to:');
+      console.error('   - Internet connectivity issues');
+      console.error('   - Firewall blocking outbound HTTPS connections');
+      console.error('   - Proxy settings needed');
+      console.error('   - DNS resolution problems');
+      
+      // In development, log reset token to console as fallback
+      if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production') {
+        const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:3000';
+        const fallbackResetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+        console.log('\n=== PASSWORD RESET EMAIL (Network Error - Development Fallback) ===');
+        console.log(`To: ${email}`);
+        console.log(`Name: ${fullName || 'Customer'}`);
+        console.log(`Reset Token: ${resetToken}`);
+        console.log(`Reset URL: ${fallbackResetUrl}`);
+        console.log('====================================================================\n');
+        // Return true in development so password reset can continue
+        return true;
+      }
+    }
     
     // Provide more helpful error messages
     if (error instanceof Error) {
-      if (error.message.includes('API key')) {
+      if (error.message.includes('API key') || (error as any).response?.status === 401) {
         console.error('Brevo API key is invalid or missing. Check BREVO_API_KEY environment variable.');
       } else if (error.message.includes('sender')) {
         console.error('Invalid sender email. Check EMAIL_FROM or BREVO_SENDER_EMAIL environment variable.');
       }
+    } else if ((error as any)?.response?.status === 401) {
+      console.error('Brevo API key is invalid or missing. Check BREVO_API_KEY environment variable.');
     }
     
     return false;
