@@ -55,9 +55,11 @@ export const getAllTickets: RequestHandler = catchAsync(
   }
 );
 
-export const getTicket: RequestHandler = factory.getOne(Ticket, {
-  path: "customerId officeId assignedTo",
-} as any);
+export const getTicket: RequestHandler = factory.getOne(Ticket, [
+  { path: "customerId", select: "fullName phoneNumber serviceNumber" },
+  { path: "officeId", select: "cityName branchName location" },
+  { path: "assignedTo", select: "fullName phoneNumber" },
+] as any);
 
 // Custom createTicket controller that uses logged-in user's officeId
 export const createTicket: RequestHandler = catchAsync(
@@ -95,6 +97,18 @@ export const createTicket: RequestHandler = catchAsync(
     req.body.officeId = officeId;
 
     console.log("Creating ticket with officeId:", req.body.officeId);
+
+    // Automatically assign to technician with least workload
+    const { findBestTechnicianForAssignment } = await import("../services/ticket.service");
+    const bestTechnicianId = await findBestTechnicianForAssignment(officeId);
+
+    if (bestTechnicianId) {
+      req.body.assignedTo = bestTechnicianId;
+      req.body.status = "Assigned"; // Set status to Assigned when auto-assigned
+      console.log(`Auto-assigning ticket to technician: ${bestTechnicianId}`);
+    } else {
+      console.log("No technicians available in this office. Ticket will remain Pending.");
+    }
 
     const ticket = await Ticket.create(req.body);
 

@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import Ticket from "../models/ticket.model";
+import User from "../models/user.model";
 import { ITicket, TicketStatus } from "../interfaces/ticket.interface";
 
 /**
@@ -273,4 +274,47 @@ export const requestRefund = async (
   });
 
   return { ticket: updatedTicket, refund };
+};
+
+/**
+ * Find the best technician to assign a ticket based on workload
+ * Returns the technician with the least number of "In Progress" and "Assigned" tickets
+ */
+export const findBestTechnicianForAssignment = async (
+  officeId: string | Types.ObjectId
+): Promise<Types.ObjectId | null> => {
+  // Find all active technicians in the same office
+  const technicians = await User.find({
+    role: "technician",
+    officeId: officeId,
+    active: true,
+  }).select("_id");
+
+  if (technicians.length === 0) {
+    return null; // No technicians available in this office
+  }
+
+  const technicianIds = technicians.map((tech) => tech._id);
+
+  // Count active tickets (In Progress + Assigned) for each technician
+  const workloadPromises = technicianIds.map(async (technicianId) => {
+    const activeTicketCount = await Ticket.countDocuments({
+      assignedTo: technicianId,
+      status: { $in: ["Assigned", "In Progress"] },
+    });
+
+    return {
+      technicianId,
+      workload: activeTicketCount,
+    };
+  });
+
+  const workloads = await Promise.all(workloadPromises);
+
+  // Sort by workload (ascending) and return the technician with least workload
+  workloads.sort((a, b) => a.workload - b.workload);
+
+  // Return the technician with the least workload
+  // If multiple have the same workload, return the first one
+  return workloads[0]?.technicianId || null;
 };
