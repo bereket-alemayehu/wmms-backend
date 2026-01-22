@@ -267,6 +267,7 @@ export const requestRefund = async (
   const refund = await Refund.create({
     ticketId: updatedTicket._id,
     customerId: updatedTicket.customerId,
+    officeId: updatedTicket.officeId,
     amount: calculateRefundAmount(ticket),
     status: "Requested",
   });

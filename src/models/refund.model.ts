@@ -13,6 +13,11 @@ const refundSchema: Schema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    officeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Office",
+      required: true,
+    },
     amount: {
       type: Number,
       required: true, // Simulated amount based on downtime
@@ -28,6 +33,10 @@ const refundSchema: Schema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Indexes for better query performance
+refundSchema.index({ officeId: 1, status: 1 });
+refundSchema.index({ customerId: 1, createdAt: -1 });
 
 const Refund: Model<IRefund> = mongoose.model<IRefund>("Refund", refundSchema);
 
