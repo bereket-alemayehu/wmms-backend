@@ -11,7 +11,8 @@
     "watch": "tsc --watch",
     "seed": "ts-node src/seeders/index.ts",
     "seed:offices": "ts-node src/seeders/office.seeder.ts",
-    "seed:users": "ts-node src/seeders/user.seeder.ts"
+    "seed:users": "ts-node src/seeders/user.seeder.ts",
+    "test:refund-eligible": "ts-node src/scripts/make-ticket-refund-eligible.ts"
   },
   "dependencies": {
     "@getbrevo/brevo": "^3.0.1",
