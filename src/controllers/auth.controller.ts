@@ -17,7 +17,7 @@ import {
     getPasswordFeedback,
     isValidEmail,
 } from "../utils/validation.utils";
-import { sendOTPEmail } from "../services/OTPEmail";
+import { sendOTPEmail, sendPasswordResetEmail } from "../services/OTPEmail";
 import {
     verifyServiceNumber as ispVerifyServiceNumber,
     getCustomerInfo,
@@ -348,8 +348,7 @@ export const refreshToken: RequestHandler = catchAsync(
 
 /**
  * FORGOT PASSWORD
- * Generate password reset token
- * Note: For now, token is logged to console (email integration can be added later)
+ * Generate password reset token and send via email
  */
 export const forgotPassword: RequestHandler = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
@@ -368,23 +367,74 @@ export const forgotPassword: RequestHandler = catchAsync(
             return next(new AppError("No user found with that service number", 404));
         }
 
+        // Check if user has an email
+        if (!user.email) {
+            return next(
+                new AppError(
+                    "No email address found for this account. Please contact support.",
+                    400
+                )
+            );
+        }
+
         // Generate reset token
         const resetToken = user.createPasswordResetToken();
         await user.save({ validateBeforeSave: false });
 
-        // TODO: Send email with reset link
-        // For now, log to console (development only)
-        console.log("\n=== PASSWORD RESET TOKEN ===");
-        console.log(`Service Number: ${user.serviceNumber}`);
-        console.log(`Reset Token: ${resetToken}`);
-        console.log(`Use this URL: /api/v1/auth/reset-password/${resetToken}`);
-        console.log("============================\n");
+        // Send password reset email
+        try {
+            const emailSent = await sendPasswordResetEmail(
+                user.email,
+                resetToken,
+                user.fullName
+            );
 
-        res.status(200).json({
-            status: "success",
-            message:
-                "Password reset token generated. Check console (development mode) or contact administrator.",
-        });
+            if (!emailSent) {
+                // If email fails, still log for development but return error
+                if (process.env.NODE_ENV === 'development') {
+                    console.log("\n=== PASSWORD RESET TOKEN (Email failed) ===");
+                    console.log(`Service Number: ${user.serviceNumber}`);
+                    console.log(`Email: ${user.email}`);
+                    console.log(`Reset Token: ${resetToken}`);
+                    const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:3000';
+                    console.log(`Use this URL: ${frontendUrl}/reset-password/${resetToken}`);
+                    console.log("============================\n");
+                }
+                
+                return next(
+                    new AppError(
+                        "Failed to send password reset email. Please try again later or contact support.",
+                        500
+                    )
+                );
+            }
+
+            res.status(200).json({
+                status: "success",
+                message: "Password reset link has been sent to your email address.",
+            });
+        } catch (error) {
+            // Log error but don't expose details to user
+            console.error("Error in password reset flow:", error);
+            
+            // In development, still log the token
+            if (process.env.NODE_ENV === 'development') {
+                console.log("\n=== PASSWORD RESET TOKEN (Fallback) ===");
+                console.log(`Service Number: ${user.serviceNumber}`);
+                console.log(`Email: ${user.email}`);
+                console.log(`Reset Token: ${resetToken}`);
+                const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:3000';
+                console.log(`Use this URL: ${frontendUrl}/reset-password/${resetToken}`);
+                console.log("============================\n");
+            }
+
+            return next(
+                new AppError(
+                    "Failed to send password reset email. Please try again later.",
+                    500
+                )
+            );
+        }
     }
 );
 
