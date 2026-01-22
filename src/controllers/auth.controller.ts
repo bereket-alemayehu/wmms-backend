@@ -132,6 +132,7 @@ export const initiateSignup: RequestHandler = catchAsync(
                 fullName: customerInfo.fullName || "Customer",
                 email: customerInfo.email.toLowerCase().trim(),
                 role: "customer",
+                officeId: customerInfo.officeId, // Assign customer to office from ISP data
                 password,
                 passwordConfirm,
                 isRegistrationComplete: false
@@ -141,6 +142,8 @@ export const initiateSignup: RequestHandler = catchAsync(
             user.password = password;
             user.passwordConfirm = passwordConfirm;
             user.email = customerInfo.email.toLowerCase().trim();
+            // Always sync officeId from ISP data
+            user.officeId = customerInfo.officeId as any;
             await user.save();
         }
 
@@ -338,7 +341,7 @@ export const forgotPassword: RequestHandler = catchAsync(
                     console.log(`Use this URL: ${frontendUrl}/reset-password/${resetToken}`);
                     console.log("============================\n");
                 }
-                
+
                 return next(
                     new AppError(
                         "Failed to send password reset email. Please try again later or contact support.",
@@ -354,7 +357,7 @@ export const forgotPassword: RequestHandler = catchAsync(
         } catch (error) {
             // Log error but don't expose details to user
             console.error("Error in password reset flow:", error);
-            
+
             // In development, still log the token
             if (process.env.NODE_ENV === 'development') {
                 console.log("\n=== PASSWORD RESET TOKEN (Fallback) ===");

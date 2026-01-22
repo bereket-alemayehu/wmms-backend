@@ -225,7 +225,7 @@ export const submitFeedback = async (
  */
 export const requestRefund = async (
   ticketId: string | Types.ObjectId
-): Promise<ITicket | null> => {
+): Promise<{ ticket: ITicket; refund: any }> => {
   const ticket = await Ticket.findById(ticketId);
 
   if (!ticket) {
@@ -240,9 +240,37 @@ export const requestRefund = async (
     throw new Error("Refund has already been requested for this ticket");
   }
 
-  return await Ticket.findByIdAndUpdate(
+  // Calculate refund amount (you can adjust this logic based on your business rules)
+  // For example: base amount + time-based calculation
+  const calculateRefundAmount = (ticket: ITicket): number => {
+    // Example: $50 base + $10 per day since ticket creation
+    const baseAmount = 50;
+    const daysOpen = Math.floor(
+      (Date.now() - ticket.createdAt.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    return baseAmount + Math.min(daysOpen * 10, 200); // Cap at $250
+  };
+
+  // Update ticket
+  const updatedTicket = await Ticket.findByIdAndUpdate(
     ticketId,
     { refundRequested: true },
     { new: true, runValidators: true }
   );
+
+  if (!updatedTicket) {
+    throw new Error("Failed to update ticket");
+  }
+
+  // Create refund document
+  const Refund = require("../models/refund.model").default;
+  const refund = await Refund.create({
+    ticketId: updatedTicket._id,
+    customerId: updatedTicket.customerId,
+    officeId: updatedTicket.officeId,
+    amount: calculateRefundAmount(ticket),
+    status: "Requested",
+  });
+
+  return { ticket: updatedTicket, refund };
 };

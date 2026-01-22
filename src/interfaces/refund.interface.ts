@@ -5,6 +5,7 @@ export type RefundStatus = "Requested" | "Approved" | "Rejected";
 export interface IRefund extends Document {
   ticketId: Types.ObjectId;
   customerId: Types.ObjectId;
+  officeId: Types.ObjectId;
   amount: number;
   status: RefundStatus;
   // adminComment?: string; // Reason for rejection or approval note

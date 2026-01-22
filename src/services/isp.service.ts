@@ -14,6 +14,7 @@ export interface CustomerInfo {
     address?: string;
     status: 'active' | 'suspended' | 'inactive';
     accountType: 'prepaid' | 'postpaid';
+    officeId?: string;
 }
 
 // Mock customer database
@@ -26,6 +27,7 @@ const mockCustomers: CustomerInfo[] = [
         address: 'Addis Ababa, Ethiopia',
         status: 'active',
         accountType: 'postpaid',
+        officeId: '6971e377264088569881196b',
     },
     {
         serviceNumber: 'WMMS-CUST-100002',
@@ -35,6 +37,7 @@ const mockCustomers: CustomerInfo[] = [
         address: 'Addis Ababa, Ethiopia',
         status: 'active',
         accountType: 'postpaid',
+        officeId: '6971e377264088569881196b',
     },
     {
         serviceNumber: 'WMMS-CUST-100003',
@@ -44,6 +47,17 @@ const mockCustomers: CustomerInfo[] = [
         address: 'Addis Ababa, Ethiopia',
         status: 'active',
         accountType: 'prepaid',
+        officeId: '6971e377264088569881196b',
+    },
+     {
+        serviceNumber: 'WMMS-CUST-100071',
+        phoneNumber: '+251942345668',
+        email: 'estifk2@gmail.com',
+        fullName: 'Abebe Kebede',
+        address: 'Addis Ababa, Ethiopia',
+        status: 'active',
+        accountType: 'postpaid',
+        officeId: '6971e377264088569881196e',
     },
     {
         serviceNumber: 'WMMS-CUST-100004',
@@ -53,6 +67,7 @@ const mockCustomers: CustomerInfo[] = [
         address: 'Addis Ababa, Ethiopia',
         status: 'active',
         accountType: 'postpaid',
+        officeId: '6971e377264088569881196b',
     },
     {
         serviceNumber: 'WMMS-CUST-100014',
@@ -62,6 +77,7 @@ const mockCustomers: CustomerInfo[] = [
         address: 'Addis Ababa, Ethiopia',
         status: 'active',
         accountType: 'postpaid',
+        officeId: '6971e377264088569881196b',
     },
     {
         serviceNumber: 'WMMS-CUST-100088',
@@ -71,6 +87,7 @@ const mockCustomers: CustomerInfo[] = [
         address: 'Addis Ababa, Ethiopia',
         status: 'active',
         accountType: 'postpaid',
+        officeId: '6971e377264088569881196b',
     },
 ];
 

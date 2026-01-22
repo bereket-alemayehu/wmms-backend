@@ -25,17 +25,20 @@ export const getAllTickets: RequestHandler = catchAsync(
       return next(new AppError("User not authenticated", 401));
     }
 
-    if (!req.user.officeId) {
-      return next(new AppError("User does not have an assigned office", 400));
-    }
-
-    const officeId = req.user.officeId;
     const { status } = req.query;
 
     // Build filter query
-    const filter: any = { officeId };
+    const filter: any = {};
     if (status) {
       filter.status = status;
+    }
+
+    // Managers can see all tickets across all offices
+    // Others are restricted to their own office
+    if (req.user.role !== "manager") {
+      filter.officeId = req.user.officeId;
+    } else if (req.query.officeId) {
+      filter.officeId = req.query.officeId;
     }
 
     const tickets = await Ticket.find(filter)
@@ -64,13 +67,32 @@ export const createTicket: RequestHandler = catchAsync(
       return next(new AppError("User not authenticated", 401));
     }
 
-    if (!req.user.officeId) {
-      return next(new AppError("User does not have an assigned office", 400));
+    // For customers, use their officeId (assigned during signup)
+    // For staff, they must have officeId
+    let officeId = req.user.officeId;
+
+    if (!officeId) {
+      // If customer doesn't have officeId, get default office
+      if (req.user.role === "customer") {
+        const Office = (await import("../models/office.model")).default;
+        const defaultOffice = await Office.findOne().sort({ createdAt: 1 });
+
+        if (!defaultOffice) {
+          return next(new AppError("No office available. Please contact support.", 500));
+        }
+
+        officeId = defaultOffice._id;
+        // Assign officeId to customer
+        req.user.officeId = officeId;
+        await req.user.save({ validateBeforeSave: false });
+      } else {
+        return next(new AppError("User does not have an assigned office", 400));
+      }
     }
 
     // Set customerId and officeId from logged-in user
     req.body.customerId = req.user._id;
-    req.body.officeId = req.user.officeId;
+    req.body.officeId = officeId;
 
     console.log("Creating ticket with officeId:", req.body.officeId);
 
@@ -220,20 +242,22 @@ export const getCustomerTickets: RequestHandler = catchAsync(
 // Custom controller: Get tickets by office
 export const getOfficeTickets: RequestHandler = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
-    // Get officeId from logged-in user
-    if (!req.user) {
+    const user = req.user;
+    if (!user) {
       return next(new AppError("User not authenticated", 401));
     }
 
-    if (!req.user.officeId) {
+    const { status } = req.query;
+    const filterOfficeId = user.role === "manager" && req.query.officeId
+      ? req.query.officeId.toString()
+      : (user.role !== "manager" ? user.officeId?.toString() : undefined);
+
+    if (user.role !== "manager" && !filterOfficeId) {
       return next(new AppError("User does not have an assigned office", 400));
     }
 
-    const officeId = req.user.officeId;
-    const { status } = req.query;
-
     const tickets = await getTicketsByOffice(
-      officeId.toString(),
+      filterOfficeId as string,
       status as TicketStatus | undefined
     );
 
@@ -330,12 +354,13 @@ export const requestTicketRefund: RequestHandler = catchAsync(
     const { id } = req.params;
 
     try {
-      const ticket = await requestRefund(id);
+      const result = await requestRefund(id);
 
       res.status(200).json({
         status: "success",
         data: {
-          ticket,
+          ticket: result.ticket,
+          refund: result.refund,
         },
       });
     } catch (error: any) {
