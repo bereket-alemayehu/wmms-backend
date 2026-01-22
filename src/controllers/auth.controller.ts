@@ -6,7 +6,6 @@ import { AppError } from "../utils/appError";
 import {
     createSendToken,
     signToken,
-    signRefreshToken,
     verifyToken,
     hashToken,
     validateServiceNumber,
@@ -17,7 +16,7 @@ import {
     getPasswordFeedback,
     isValidEmail,
 } from "../utils/validation.utils";
-import { sendOTPEmail } from "../services/OTPEmail";
+import { sendOTPEmail, sendPasswordResetEmail } from "../services/OTPEmail";
 import {
     verifyServiceNumber as ispVerifyServiceNumber,
     getCustomerInfo,
@@ -261,11 +260,6 @@ export const login: RequestHandler = catchAsync(
             return next(new AppError("Invalid service number or password", 401));
         }
 
-        // Update refresh token in database
-        const refreshToken = signRefreshToken(user._id);
-        user.refreshToken = refreshToken;
-        await user.save({ validateBeforeSave: false });
-
         // Generate tokens and send response
         createSendToken(user, 200, res, "Logged in successfully");
     }
@@ -277,18 +271,8 @@ export const login: RequestHandler = catchAsync(
  */
 export const logout: RequestHandler = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
-        // Clear refresh token from database
-        if (req.user) {
-            req.user.refreshToken = undefined;
-            await req.user.save({ validateBeforeSave: false });
-        }
-
         // Clear cookies
         res.cookie("jwt", "loggedout", {
-            expires: new Date(Date.now() + 10 * 1000),
-            httpOnly: true,
-        });
-        res.cookie("refreshToken", "loggedout", {
             expires: new Date(Date.now() + 10 * 1000),
             httpOnly: true,
         });
@@ -301,55 +285,8 @@ export const logout: RequestHandler = catchAsync(
 );
 
 /**
- * REFRESH TOKEN
- * Issue new access token using refresh token
- */
-export const refreshToken: RequestHandler = catchAsync(
-    async (req: Request, res: Response, next: NextFunction) => {
-        // Get refresh token from cookie or body
-        let refreshToken = req.cookies.refreshToken;
-        if (!refreshToken && req.body.refreshToken) {
-            refreshToken = req.body.refreshToken;
-        }
-
-        if (!refreshToken) {
-            return next(new AppError("Refresh token not provided", 401));
-        }
-
-        // Verify refresh token
-        let decoded;
-        try {
-            decoded = await verifyToken(refreshToken, true);
-        } catch (err) {
-            return next(new AppError("Invalid or expired refresh token", 401));
-        }
-
-        // Find user and verify refresh token matches
-        const user = await User.findById(decoded.id).select("+refreshToken");
-        if (!user) {
-            return next(new AppError("User no longer exists", 401));
-        }
-
-        if (user.refreshToken !== refreshToken) {
-            return next(new AppError("Invalid refresh token", 401));
-        }
-
-        // Generate new access token
-        const newAccessToken = signToken(user._id);
-
-        // Send new access token
-        res.status(200).json({
-            status: "success",
-            message: "Token refreshed successfully",
-            accessToken: newAccessToken,
-        });
-    }
-);
-
-/**
  * FORGOT PASSWORD
- * Generate password reset token
- * Note: For now, token is logged to console (email integration can be added later)
+ * Generate password reset token and send via email
  */
 export const forgotPassword: RequestHandler = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
@@ -368,23 +305,74 @@ export const forgotPassword: RequestHandler = catchAsync(
             return next(new AppError("No user found with that service number", 404));
         }
 
+        // Check if user has an email
+        if (!user.email) {
+            return next(
+                new AppError(
+                    "No email address found for this account. Please contact support.",
+                    400
+                )
+            );
+        }
+
         // Generate reset token
         const resetToken = user.createPasswordResetToken();
         await user.save({ validateBeforeSave: false });
 
-        // TODO: Send email with reset link
-        // For now, log to console (development only)
-        console.log("\n=== PASSWORD RESET TOKEN ===");
-        console.log(`Service Number: ${user.serviceNumber}`);
-        console.log(`Reset Token: ${resetToken}`);
-        console.log(`Use this URL: /api/v1/auth/reset-password/${resetToken}`);
-        console.log("============================\n");
+        // Send password reset email
+        try {
+            const emailSent = await sendPasswordResetEmail(
+                user.email,
+                resetToken,
+                user.fullName
+            );
 
-        res.status(200).json({
-            status: "success",
-            message:
-                "Password reset token generated. Check console (development mode) or contact administrator.",
-        });
+            if (!emailSent) {
+                // If email fails, still log for development but return error
+                if (process.env.NODE_ENV === 'development') {
+                    console.log("\n=== PASSWORD RESET TOKEN (Email failed) ===");
+                    console.log(`Service Number: ${user.serviceNumber}`);
+                    console.log(`Email: ${user.email}`);
+                    console.log(`Reset Token: ${resetToken}`);
+                    const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:3000';
+                    console.log(`Use this URL: ${frontendUrl}/reset-password/${resetToken}`);
+                    console.log("============================\n");
+                }
+                
+                return next(
+                    new AppError(
+                        "Failed to send password reset email. Please try again later or contact support.",
+                        500
+                    )
+                );
+            }
+
+            res.status(200).json({
+                status: "success",
+                message: "Password reset link has been sent to your email address.",
+            });
+        } catch (error) {
+            // Log error but don't expose details to user
+            console.error("Error in password reset flow:", error);
+            
+            // In development, still log the token
+            if (process.env.NODE_ENV === 'development') {
+                console.log("\n=== PASSWORD RESET TOKEN (Fallback) ===");
+                console.log(`Service Number: ${user.serviceNumber}`);
+                console.log(`Email: ${user.email}`);
+                console.log(`Reset Token: ${resetToken}`);
+                const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:3000';
+                console.log(`Use this URL: ${frontendUrl}/reset-password/${resetToken}`);
+                console.log("============================\n");
+            }
+
+            return next(
+                new AppError(
+                    "Failed to send password reset email. Please try again later.",
+                    500
+                )
+            );
+        }
     }
 );
 

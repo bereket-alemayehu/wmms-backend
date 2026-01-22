@@ -5,7 +5,6 @@ import {
     verifyOTP,
     login,
     logout,
-    refreshToken,
     forgotPassword,
     resetPassword,
     updatePassword,
@@ -58,9 +57,6 @@ router.post("/signup/verify-otp", verifyOTP);
 router.post("/login", login);
 router.post("/forgot-password", forgotPassword);
 router.patch("/reset-password/:token", resetPassword);
-
-// Token management
-router.post("/refresh", refreshToken);
 
 // Protected routes (require authentication)
 router.use(protectUser); // All routes after this require authentication
