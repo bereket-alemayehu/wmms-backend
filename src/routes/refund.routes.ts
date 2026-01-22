@@ -19,8 +19,8 @@ router.use(protectUser);
 // DELETE: Manager only
 router
   .route("/")
-  .get(getAllRefunds)
-  .post(restrictTo("customer", "supervisor", "manager"), createRefund);
+  .get(getAllRefunds);
+  // .post(restrictTo("customer", "supervisor", "manager"), createRefund); // Removed: Refunds are now created automatically via ticket refund requests
 
 router
   .route("/:id")

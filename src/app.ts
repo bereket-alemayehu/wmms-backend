@@ -19,11 +19,13 @@ import authRouter from "./routes/auth.routes";
 
 import globalErrorHandler from "./controllers/error.controller";
 import { sanitizeInputs } from "./middlewares/middleware";
+import { startRefundCronJob } from "./services/cron.service";
 
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   "http://localhost:3001",
+  "http://localhost:3000",
   "http://192.168.0.112:3000",
   "https://addisbroker.tetertechs.com",
   "https://test.addisbroker.tetertechs.com",
@@ -91,6 +93,9 @@ app.use("/api/v1/offices", officeRouter);
 app.use("/api/v1/refunds", refundRouter);
 app.use("/api/v1/outages", outageRouter);
 app.use("/api/v1/tickets", ticketRouter);
+
+// Initialize cron jobs
+startRefundCronJob();
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   console.log(req.originalUrl, "error");
