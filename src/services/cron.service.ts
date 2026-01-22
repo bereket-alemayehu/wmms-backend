@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import Ticket from "../models/ticket.model";
-import { requestRefund } from "./ticket.service";
+import Refund from "../models/refund.model";
+import { requestRefund, updateTicketStatus } from "./ticket.service";
 
 /**
  * Cron job to automatically process refund requests for eligible tickets
@@ -55,6 +56,97 @@ export const startRefundCronJob = () => {
   });
 
   console.log("✅ Automatic refund processing cron job scheduled (runs daily at 2:00 AM)");
+};
+
+/**
+ * Cron job to automatically confirm resolved tickets and approve refunds
+ * Runs every 24 hours (daily at 3:00 AM)
+ */
+export const startAutoConfirmationCronJob = () => {
+  // Schedule: Run every day at 3:00 AM
+  // Format: minute hour day month weekday
+  cron.schedule("0 3 * * *", async () => {
+    console.log("🕐 [Auto-Confirmation Cron] Starting automatic confirmation and approval...");
+
+    try {
+      // 1. Auto-confirm resolved tickets (change to Closed)
+      const resolvedTickets = await Ticket.find({
+        status: "Resolved",
+      });
+
+      console.log(
+        `📋 [Auto-Confirmation Cron] Found ${resolvedTickets.length} resolved tickets to auto-confirm`
+      );
+
+      let ticketsConfirmed = 0;
+      let ticketsFailed = 0;
+
+      for (const ticket of resolvedTickets) {
+        try {
+          await updateTicketStatus(ticket._id.toString(), "Closed");
+          ticketsConfirmed++;
+          console.log(
+            `✅ [Auto-Confirmation Cron] Auto-confirmed ticket ${ticket._id} (changed to Closed)`
+          );
+        } catch (error: any) {
+          ticketsFailed++;
+          console.error(
+            `❌ [Auto-Confirmation Cron] Failed to auto-confirm ticket ${ticket._id}: ${error.message}`
+          );
+        }
+      }
+
+      // 2. Auto-approve refunds for closed tickets
+      const closedTickets = await Ticket.find({
+        status: "Closed",
+      }).select("_id");
+
+      const closedTicketIds = closedTickets.map((t) => t._id);
+
+      const pendingRefunds = await Refund.find({
+        ticketId: { $in: closedTicketIds },
+        status: "Requested",
+      });
+
+      console.log(
+        `📋 [Auto-Confirmation Cron] Found ${pendingRefunds.length} refunds to auto-approve`
+      );
+
+      let refundsApproved = 0;
+      let refundsFailed = 0;
+
+      for (const refund of pendingRefunds) {
+        try {
+          await Refund.findByIdAndUpdate(
+            refund._id,
+            { status: "Approved" },
+            { new: true, runValidators: true }
+          );
+          refundsApproved++;
+          console.log(
+            `✅ [Auto-Confirmation Cron] Auto-approved refund ${refund._id} for closed ticket`
+          );
+        } catch (error: any) {
+          refundsFailed++;
+          console.error(
+            `❌ [Auto-Confirmation Cron] Failed to auto-approve refund ${refund._id}: ${error.message}`
+          );
+        }
+      }
+
+      console.log(
+        `✨ [Auto-Confirmation Cron] Completed. ` +
+        `Tickets: ${ticketsConfirmed} confirmed, ${ticketsFailed} failed. ` +
+        `Refunds: ${refundsApproved} approved, ${refundsFailed} failed.`
+      );
+    } catch (error: any) {
+      console.error(
+        `💥 [Auto-Confirmation Cron] Error during auto-confirmation: ${error.message}`
+      );
+    }
+  });
+
+  console.log("✅ Auto-confirmation cron job scheduled (runs daily at 3:00 AM)");
 };
 
 /**

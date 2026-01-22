@@ -55,9 +55,11 @@ export const getAllTickets: RequestHandler = catchAsync(
   }
 );
 
-export const getTicket: RequestHandler = factory.getOne(Ticket, {
-  path: "customerId officeId assignedTo",
-} as any);
+export const getTicket: RequestHandler = factory.getOne(Ticket, [
+  { path: "customerId", select: "fullName phoneNumber serviceNumber" },
+  { path: "officeId", select: "cityName branchName location" },
+  { path: "assignedTo", select: "fullName phoneNumber" },
+] as any);
 
 // Custom createTicket controller that uses logged-in user's officeId
 export const createTicket: RequestHandler = catchAsync(
@@ -95,6 +97,18 @@ export const createTicket: RequestHandler = catchAsync(
     req.body.officeId = officeId;
 
     console.log("Creating ticket with officeId:", req.body.officeId);
+
+    // Automatically assign to technician with least workload
+    const { findBestTechnicianForAssignment } = await import("../services/ticket.service");
+    const bestTechnicianId = await findBestTechnicianForAssignment(officeId);
+
+    if (bestTechnicianId) {
+      req.body.assignedTo = bestTechnicianId;
+      req.body.status = "Assigned"; // Set status to Assigned when auto-assigned
+      console.log(`Auto-assigning ticket to technician: ${bestTechnicianId}`);
+    } else {
+      console.log("No technicians available in this office. Ticket will remain Pending.");
+    }
 
     const ticket = await Ticket.create(req.body);
 
@@ -182,37 +196,54 @@ export const assignTicketToTechnician: RequestHandler = catchAsync(
 );
 
 // Custom controller: Update ticket status
+// Only allows "In Progress" and "Resolved" status changes
+// "Assigned" is only set via assignment endpoint
+// "Closed" is only set via customer confirmation endpoint
 export const changeTicketStatus: RequestHandler = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     const { id } = req.params;
-    const { status, assignedTo } = req.body;
+    const { status } = req.body;
 
     if (!status) {
       return next(new AppError("Status is required", 400));
     }
 
-    const validStatuses: TicketStatus[] = [
-      "Pending",
-      "Assigned",
-      "In Progress",
-      "Resolved",
-      "Closed",
-    ];
+    // Only allow "In Progress" and "Resolved" for manual status changes
+    const allowedStatuses: TicketStatus[] = ["In Progress", "Resolved"];
 
-    if (!validStatuses.includes(status)) {
-      return next(new AppError("Invalid status", 400));
+    if (!allowedStatuses.includes(status)) {
+      return next(new AppError(
+        "Invalid status. Only 'In Progress' and 'Resolved' can be set manually. " +
+        "'Assigned' is set via assignment, and 'Closed' is set via customer confirmation.",
+        400
+      ));
     }
 
-    const ticket = await updateTicketStatus(id, status, assignedTo);
-
+    // Get the ticket first to check permissions
+    const ticket = await Ticket.findById(id);
     if (!ticket) {
       return next(new AppError("Ticket not found", 404));
+    }
+
+    // Permission check for technicians
+    if (req.user?.role === "technician") {
+      // Technicians can only update tickets assigned to them
+      if (!ticket.assignedTo || ticket.assignedTo.toString() !== req.user._id.toString()) {
+        return next(new AppError("You can only update status of tickets assigned to you", 403));
+      }
+    }
+
+    // Update the ticket status
+    const updatedTicket = await updateTicketStatus(id, status);
+
+    if (!updatedTicket) {
+      return next(new AppError("Failed to update ticket status", 500));
     }
 
     res.status(200).json({
       status: "success",
       data: {
-        ticket,
+        ticket: updatedTicket,
       },
     });
   }
@@ -366,5 +397,91 @@ export const requestTicketRefund: RequestHandler = catchAsync(
     } catch (error: any) {
       return next(new AppError(error.message, 400));
     }
+  }
+);
+
+// Custom controller: Customer confirms resolution (changes status to Closed)
+export const confirmTicketResolution: RequestHandler = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+
+    // Get the ticket
+    const ticket = await Ticket.findById(id);
+    if (!ticket) {
+      return next(new AppError("Ticket not found", 404));
+    }
+
+    // Only customers can confirm resolution
+    if (req.user?.role !== "customer") {
+      return next(new AppError("Only customers can confirm ticket resolution", 403));
+    }
+
+    // Check if the ticket belongs to the customer
+    if (ticket.customerId.toString() !== req.user._id.toString()) {
+      return next(new AppError("You can only confirm your own tickets", 403));
+    }
+
+    // Only "Resolved" tickets can be confirmed
+    if (ticket.status !== "Resolved") {
+      return next(new AppError("Only resolved tickets can be confirmed", 400));
+    }
+
+    // Update status to Closed
+    const updatedTicket = await updateTicketStatus(id, "Closed");
+
+    if (!updatedTicket) {
+      return next(new AppError("Failed to confirm ticket resolution", 500));
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Ticket resolution confirmed successfully",
+      data: {
+        ticket: updatedTicket,
+      },
+    });
+  }
+);
+
+// Custom controller: Customer marks ticket as not resolved (changes status back to In Progress)
+export const markTicketNotResolved: RequestHandler = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+
+    // Get the ticket
+    const ticket = await Ticket.findById(id);
+    if (!ticket) {
+      return next(new AppError("Ticket not found", 404));
+    }
+
+    // Only customers can mark as not resolved
+    if (req.user?.role !== "customer") {
+      return next(new AppError("Only customers can mark tickets as not resolved", 403));
+    }
+
+    // Check if the ticket belongs to the customer
+    if (ticket.customerId.toString() !== req.user._id.toString()) {
+      return next(new AppError("You can only mark your own tickets as not resolved", 403));
+    }
+
+    // Only "Resolved" tickets can be marked as not resolved
+    if (ticket.status !== "Resolved") {
+      return next(new AppError("Only resolved tickets can be marked as not resolved", 400));
+    }
+
+    // Update status back to In Progress
+    const updatedTicket = await updateTicketStatus(id, "In Progress");
+
+    if (!updatedTicket) {
+      return next(new AppError("Failed to mark ticket as not resolved", 500));
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Ticket marked as not resolved. Status changed to 'In Progress'",
+      data: {
+        ticket: updatedTicket,
+      },
+    });
   }
 );

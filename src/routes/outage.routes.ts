@@ -20,7 +20,7 @@ router.use(protectUser);
 router
   .route("/")
   .get(getAllOutages)
-  .post(restrictTo("technician", "supervisor", "manager"), createOutage);
+  .post(restrictTo( "supervisor", "manager"), createOutage);
 
 router
   .route("/:id")

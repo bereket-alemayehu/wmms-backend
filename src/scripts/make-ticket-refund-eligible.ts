@@ -22,7 +22,7 @@ const makeTicketRefundEligible = async () => {
     console.log("✅ Connected to MongoDB");
 
     // Ticket ID to update
-    const ticketId = "6971e6df4eb6f7653edd889b";
+    const ticketId = "697276c6f57b764d246eb93a";
 
     // Find and update the ticket
     const ticket = await Ticket.findById(ticketId);
