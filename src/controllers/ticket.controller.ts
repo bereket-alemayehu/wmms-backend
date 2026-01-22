@@ -55,11 +55,59 @@ export const getAllTickets: RequestHandler = catchAsync(
   }
 );
 
-export const getTicket: RequestHandler = factory.getOne(Ticket, [
-  { path: "customerId", select: "fullName phoneNumber serviceNumber" },
-  { path: "officeId", select: "cityName branchName location" },
-  { path: "assignedTo", select: "fullName phoneNumber" },
-] as any);
+export const getTicket: RequestHandler = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+    
+    const ticket = await Ticket.findById(id)
+      .populate("customerId", "fullName phoneNumber serviceNumber")
+      .populate("officeId", "cityName branchName location")
+      .populate("assignedTo", "fullName phoneNumber");
+    
+    if (!ticket) {
+      return next(new AppError("No ticket found with that ID", 404));
+    }
+
+    // Transform the response to match frontend expectations
+    const ticketDoc = ticket.toObject();
+    
+    // Helper function to check if a field is a populated Mongoose document object
+    const isPopulatedObject = (field: any): boolean => {
+      return field && typeof field === 'object' && field._id && Object.keys(field).length > 1;
+    };
+    
+    const transformedTicket = {
+      ...ticketDoc,
+      // Map populated fields to expected frontend field names
+      customer: isPopulatedObject(ticketDoc.customerId) 
+        ? ticketDoc.customerId 
+        : undefined,
+      office: isPopulatedObject(ticketDoc.officeId) 
+        ? ticketDoc.officeId 
+        : undefined,
+      technician: isPopulatedObject(ticketDoc.assignedTo) 
+        ? ticketDoc.assignedTo 
+        : undefined,
+      // Keep the IDs as strings for consistency
+      customerId: isPopulatedObject(ticketDoc.customerId)
+        ? (ticketDoc.customerId as any)._id.toString()
+        : (ticketDoc.customerId?.toString() || ticketDoc.customerId),
+      officeId: isPopulatedObject(ticketDoc.officeId)
+        ? (ticketDoc.officeId as any)._id.toString()
+        : (ticketDoc.officeId?.toString() || ticketDoc.officeId),
+      assignedTo: isPopulatedObject(ticketDoc.assignedTo)
+        ? (ticketDoc.assignedTo as any)._id.toString()
+        : (ticketDoc.assignedTo?.toString() || ticketDoc.assignedTo),
+    };
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        document: transformedTicket,
+      },
+    });
+  }
+);
 
 // Custom createTicket controller that uses logged-in user's officeId
 export const createTicket: RequestHandler = catchAsync(
