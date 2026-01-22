@@ -17,16 +17,73 @@ import { AppError } from "../utils/appError";
 import { catchAsync } from "../utils/catchAsync";
 import { TicketStatus } from "../interfaces/ticket.interface";
 
-// Basic CRUD operations using factory
-export const getAllTickets: RequestHandler = factory.getAll(Ticket, {
-  path: "customerId officeId assignedTo",
-} as any);
+// Custom getAllTickets controller that filters by logged-in user's officeId
+export const getAllTickets: RequestHandler = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    // Get officeId from logged-in user
+    if (!req.user) {
+      return next(new AppError("User not authenticated", 401));
+    }
+
+    if (!req.user.officeId) {
+      return next(new AppError("User does not have an assigned office", 400));
+    }
+
+    const officeId = req.user.officeId;
+    const { status } = req.query;
+
+    // Build filter query
+    const filter: any = { officeId };
+    if (status) {
+      filter.status = status;
+    }
+
+    const tickets = await Ticket.find(filter)
+      .populate("customerId officeId assignedTo")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      status: "success",
+      results: tickets.length,
+      data: {
+        documents: tickets,
+      },
+    });
+  }
+);
 
 export const getTicket: RequestHandler = factory.getOne(Ticket, {
   path: "customerId officeId assignedTo",
 } as any);
 
-export const createTicket: RequestHandler = factory.createOne(Ticket);
+// Custom createTicket controller that uses logged-in user's officeId
+export const createTicket: RequestHandler = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    // Get officeId from logged-in user
+    if (!req.user) {
+      return next(new AppError("User not authenticated", 401));
+    }
+
+    if (!req.user.officeId) {
+      return next(new AppError("User does not have an assigned office", 400));
+    }
+
+    // Set customerId and officeId from logged-in user
+    req.body.customerId = req.user._id;
+    req.body.officeId = req.user.officeId;
+
+    console.log("Creating ticket with officeId:", req.body.officeId);
+
+    const ticket = await Ticket.create(req.body);
+
+    res.status(201).json({
+      status: "success",
+      data: {
+        document: ticket,
+      },
+    });
+  }
+);
 
 export const updateTicket: RequestHandler = factory.updateOne(Ticket);
 
@@ -163,11 +220,20 @@ export const getCustomerTickets: RequestHandler = catchAsync(
 // Custom controller: Get tickets by office
 export const getOfficeTickets: RequestHandler = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
-    const { officeId } = req.params;
+    // Get officeId from logged-in user
+    if (!req.user) {
+      return next(new AppError("User not authenticated", 401));
+    }
+
+    if (!req.user.officeId) {
+      return next(new AppError("User does not have an assigned office", 400));
+    }
+
+    const officeId = req.user.officeId;
     const { status } = req.query;
 
     const tickets = await getTicketsByOffice(
-      officeId,
+      officeId.toString(),
       status as TicketStatus | undefined
     );
 
@@ -209,7 +275,16 @@ export const getTechnicianTickets: RequestHandler = catchAsync(
 // Custom controller: Get queue statistics
 export const getOfficeQueueStatistics: RequestHandler = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
-    const { officeId } = req.params;
+    // Get officeId from logged-in user
+    if (!req.user) {
+      return next(new AppError("User not authenticated", 401));
+    }
+
+    if (!req.user.officeId) {
+      return next(new AppError("User does not have an assigned office", 400));
+    }
+
+    const officeId = req.user.officeId.toString();
 
     const statistics = await getQueueStatistics(officeId);
 
