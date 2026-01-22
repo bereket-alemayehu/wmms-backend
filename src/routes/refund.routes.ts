@@ -13,19 +13,20 @@ const router: Router = Router();
 // All routes require authentication
 router.use(protectUser);
 
-// GET: Customers see their own, staff see all
-// POST: Customer (create refund request)
-// PATCH: Supervisor and above (approve/reject)
+// GET: Restricted to customers and managers only
+//   - Customers see only their own refunds
+//   - Managers see only refunds from their office (higher role)
+// POST: Removed - Refunds are now created automatically via ticket refund requests
+// PATCH: Manager only (approve/reject)
 // DELETE: Manager only
 router
   .route("/")
-  .get(getAllRefunds)
-  .post(restrictTo("customer", "supervisor", "manager"), createRefund);
+  .get(restrictTo("customer", "manager"), getAllRefunds);
 
 router
   .route("/:id")
-  .get(getRefund)
-  .patch(restrictTo("supervisor", "manager"), updateRefund)
+  .get(restrictTo("customer", "manager"), getRefund)
+  .patch(restrictTo("manager"), updateRefund)
   .delete(restrictTo("manager"), deleteRefund);
 
 export default router;

@@ -354,12 +354,13 @@ export const requestTicketRefund: RequestHandler = catchAsync(
     const { id } = req.params;
 
     try {
-      const ticket = await requestRefund(id);
+      const result = await requestRefund(id);
 
       res.status(200).json({
         status: "success",
         data: {
-          ticket,
+          ticket: result.ticket,
+          refund: result.refund,
         },
       });
     } catch (error: any) {
