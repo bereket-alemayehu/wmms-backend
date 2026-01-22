@@ -23,7 +23,7 @@ import { sanitizeInputs } from "./middlewares/middleware";
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
-  "http://localhost:3000",
+  "http://localhost:3001",
   "http://192.168.0.112:3000",
   "https://addisbroker.tetertechs.com",
   "https://test.addisbroker.tetertechs.com",

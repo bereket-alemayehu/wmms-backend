@@ -31,7 +31,7 @@ export const seedUsers = async (): Promise<void> => {
     // Note: Passwords will be hashed before inserting (insertMany bypasses pre-save hooks)
     // passwordConfirm is not needed for seeding
 
-    // Customers (no officeId required)
+    // Customers (assigned to Bole Office)
     const customers = [
       {
         fullName: "Abebe Kebede",
@@ -39,6 +39,7 @@ export const seedUsers = async (): Promise<void> => {
         email: "estifk2@gmail.com",
         serviceNumber: "WMMS-CUST-100001",
         role: "customer",
+        officeId: boleOffice?._id,
         password: DEFAULT_PASSWORD,
         isRegistrationComplete: true,
         otpVerified: true,
@@ -50,6 +51,7 @@ export const seedUsers = async (): Promise<void> => {
         email: "estifanosk3@gmail.com",
         serviceNumber: "WMMS-CUST-100002",
         role: "customer",
+        officeId: boleOffice?._id,
         password: DEFAULT_PASSWORD,
         isRegistrationComplete: true,
         otpVerified: true,
@@ -61,6 +63,7 @@ export const seedUsers = async (): Promise<void> => {
         email: "bereketalemayehuf@gmail.com",
         serviceNumber: "WMMS-CUST-100003",
         role: "customer",
+        officeId: boleOffice?._id,
         password: DEFAULT_PASSWORD,
         isRegistrationComplete: true,
         otpVerified: true,
@@ -72,6 +75,7 @@ export const seedUsers = async (): Promise<void> => {
         email: "bereketalemayehuf@gmail.com",
         serviceNumber: "WMMS-CUST-100004",
         role: "customer",
+        officeId: boleOffice?._id,
         password: DEFAULT_PASSWORD,
         isRegistrationComplete: true,
         otpVerified: true,
@@ -83,6 +87,7 @@ export const seedUsers = async (): Promise<void> => {
         email: "bereketalemayehuf@gmail.com",
         serviceNumber: "WMMS-CUST-100005",
         role: "customer",
+        officeId: boleOffice?._id,
         password: DEFAULT_PASSWORD,
         isRegistrationComplete: true,
         otpVerified: true,

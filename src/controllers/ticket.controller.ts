@@ -26,7 +26,34 @@ export const getTicket: RequestHandler = factory.getOne(Ticket, {
   path: "customerId officeId assignedTo",
 } as any);
 
-export const createTicket: RequestHandler = factory.createOne(Ticket);
+// Custom createTicket controller that uses logged-in user's officeId
+export const createTicket: RequestHandler = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    // Get officeId from logged-in user
+    if (!req.user) {
+      return next(new AppError("User not authenticated", 401));
+    }
+
+    if (!req.user.officeId) {
+      return next(new AppError("User does not have an assigned office", 400));
+    }
+
+    // Set customerId and officeId from logged-in user
+    req.body.customerId = req.user._id;
+    req.body.officeId = req.user.officeId;
+
+    console.log("Creating ticket with officeId:", req.body.officeId);
+
+    const ticket = await Ticket.create(req.body);
+
+    res.status(201).json({
+      status: "success",
+      data: {
+        document: ticket,
+      },
+    });
+  }
+);
 
 export const updateTicket: RequestHandler = factory.updateOne(Ticket);
 
