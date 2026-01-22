@@ -16,18 +16,6 @@ export const signToken = (id: Types.ObjectId | string): string => {
 };
 
 /**
- * Generate JWT refresh token (long-lived)
- */
-export const signRefreshToken = (id: Types.ObjectId | string): string => {
-    const secret = process.env.JWT_REFRESH_SECRET || "default-refresh-secret-change-in-production";
-
-    // @ts-ignore - JWT accepts string expiresIn despite type definition
-    return jwt.sign({ id: id.toString() }, secret, {
-        expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d",
-    });
-};
-
-/**
  * Cookie options for secure token storage
  */
 const getCookieOptions = (req: Request, maxAge: number) => {
@@ -52,19 +40,10 @@ export const createSendToken = (
     message: string = "Success"
 ) => {
     const accessToken = signToken(user._id);
-    const refreshToken = signRefreshToken(user._id);
 
     // Access token cookie (15 minutes)
     const accessTokenMaxAge = 15 * 60 * 1000; // 15 minutes in ms
     res.cookie("jwt", accessToken, getCookieOptions({} as Request, accessTokenMaxAge));
-
-    // Refresh token cookie (7 days)
-    const refreshTokenMaxAge = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
-    res.cookie(
-        "refreshToken",
-        refreshToken,
-        getCookieOptions({} as Request, refreshTokenMaxAge)
-    );
 
     // Remove password from output
     user.password = undefined;
@@ -78,7 +57,6 @@ export const createSendToken = (
         status: "success",
         message,
         accessToken,
-        refreshToken,
         data: {
             user,
         },
@@ -88,10 +66,8 @@ export const createSendToken = (
 /**
  * Verify JWT token
  */
-export const verifyToken = (token: string, isRefreshToken: boolean = false): Promise<any> => {
-    const secret = isRefreshToken
-        ? (process.env.JWT_REFRESH_SECRET || "default-refresh-secret-change-in-production")
-        : (process.env.JWT_SECRET || "default-secret-change-in-production");
+export const verifyToken = (token: string): Promise<any> => {
+    const secret = process.env.JWT_SECRET || "default-secret-change-in-production";
 
     return new Promise((resolve, reject) => {
         jwt.verify(token, secret, (err, decoded) => {
