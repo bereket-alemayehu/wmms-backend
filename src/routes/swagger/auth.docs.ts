@@ -12,11 +12,6 @@
  *       in: cookie
  *       name: jwt
  *       description: JWT token in HTTP-only cookie
- *     refreshToken:
- *       type: apiKey
- *       in: cookie
- *       name: refreshToken
- *       description: Refresh token in HTTP-only cookie
  *   schemas:
  *     AuthResponse:
  *       type: object
@@ -28,9 +23,6 @@
  *           type: string
  *           example: Logged in successfully
  *         accessToken:
- *           type: string
- *           example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
- *         refreshToken:
  *           type: string
  *           example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
  *         data:
@@ -81,8 +73,8 @@
  * @swagger
  * /api/v1/auth/signup/initiate:
  *   post:
- *     summary: Initiate customer signup (Step 1 of 3)
- *     description: Verify customer service number and send OTP via SMS for account activation
+ *     summary: Initiate customer signup (Step 1 of 2)
+ *     description: Verify customer service number and send OTP via email for account activation
  *     tags:
  *       - Authentication
  *     requestBody:
@@ -122,16 +114,16 @@
  *                   example: success
  *                 message:
  *                   type: string
- *                   example: OTP sent to +251****5678. Valid for 5 minutes.
+ *                   example: OTP sent to ab***@example.com. Valid for 5 minutes.
  *                 data:
  *                   type: object
  *                   properties:
  *                     fullName:
  *                       type: string
  *                       example: John Doe
- *                     phoneNumber:
+ *                     email:
  *                       type: string
- *                       example: "+251****5678"
+ *                       example: "ab***@example.com"
  *       400:
  *         description: Invalid service number or already registered
  *       404:
@@ -143,7 +135,7 @@
  * /api/v1/auth/signup/verify-otp:
  *   post:
  *     summary: Verify OTP & Complete Signup (Step 2 of 2)
- *     description: Verify the OTP received via SMS and complete the account activation
+ *     description: Verify the OTP received via email and complete the account activation
  *     tags:
  *       - Authentication
  *     requestBody:
@@ -161,13 +153,8 @@
  *                 example: WMMS-CUST-100234
  *               otp:
  *                 type: string
- *                 description: 6-digit OTP code
+ *                 description: 6-digit OTP code received via email
  *                 example: "123456"
- *               email:
- *                 type: string
- *                 format: email
- *                 description: Email address (optional)
- *                 example: john@example.com
  *     responses:
  *       200:
  *         description: OTP verified and account created successfully
@@ -247,36 +234,10 @@
 
 /**
  * @swagger
- * /api/v1/auth/refresh:
- *   post:
- *     summary: Refresh access token
- *     description: Generate a new access token using a valid refresh token
- *     tags:
- *       - Authentication
- *     security:
- *       - refreshToken: []
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               refreshToken:
- *                 type: string
- *                 example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
- *     responses:
- *       200:
- *         description: Token refreshed successfully
- *       401:
- *         description: Invalid or expired refresh token
- */
-
-/**
- * @swagger
  * /api/v1/auth/forgot-password:
  *   post:
  *     summary: Request password reset
- *     description: Generate a password reset token. In development, token is logged to console. In production, sent via SMS/email.
+ *     description: Generate a password reset token and send it via email. In development, token is also logged to console.
  *     tags:
  *       - Authentication
  *     requestBody:
