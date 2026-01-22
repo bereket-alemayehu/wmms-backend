@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import { generateOTPEmailHTML, generateOTPEmailText, getOTPEmailSubject, OTPEmailData } from '../templates/EmailOTP';
+import { generateResetPasswordEmailHTML, generateResetPasswordEmailText, getResetPasswordEmailSubject, ResetPasswordEmailData } from '../templates/reset-password';
 
 dotenv.config();
 
@@ -86,6 +87,41 @@ export const sendOTPEmail = async (
     return true;
   } catch (error) {
     console.error('Error sending OTP email:', error);
+    return false;
+  }
+};
+
+/**
+ * Send Password Reset Email
+ */
+export const sendPasswordResetEmail = async (
+  email: string,
+  resetToken: string,
+  fullName?: string
+): Promise<boolean> => {
+  try {
+    // Construct reset URL
+    const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:3000';
+    const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+
+    const emailData: ResetPasswordEmailData = {
+      resetUrl,
+      fullName,
+      validityMinutes: 10, // Token expires in 10 minutes
+    };
+
+    const mailOptions: nodemailer.SendMailOptions = {
+      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      to: email,
+      subject: getResetPasswordEmailSubject(),
+      text: generateResetPasswordEmailText(emailData),
+      html: generateResetPasswordEmailHTML(emailData),
+    };
+
+    await sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error('Error sending password reset email:', error);
     return false;
   }
 };
