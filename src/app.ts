@@ -16,6 +16,7 @@ import ticketRouter from "./routes/ticket.routes";
 import swaggerUI from "swagger-ui-express";
 import swaggerSpec from "./swagger";
 import authRouter from "./routes/auth.routes";
+import ispRouter from "./routes/isp.routes";
 
 import globalErrorHandler from "./controllers/error.controller";
 import { sanitizeInputs } from "./middlewares/middleware";
@@ -93,6 +94,7 @@ app.use("/api/v1/offices", officeRouter);
 app.use("/api/v1/refunds", refundRouter);
 app.use("/api/v1/outages", outageRouter);
 app.use("/api/v1/tickets", ticketRouter);
+app.use("/api/v1/isp", ispRouter);
 
 // Initialize cron jobs
 startRefundCronJob();
