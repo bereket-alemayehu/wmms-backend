@@ -19,7 +19,7 @@ import authRouter from "./routes/auth.routes";
 
 import globalErrorHandler from "./controllers/error.controller";
 import { sanitizeInputs } from "./middlewares/middleware";
-import { startRefundCronJob } from "./services/cron.service";
+import { startRefundCronJob, startAutoConfirmationCronJob } from "./services/cron.service";
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -96,6 +96,7 @@ app.use("/api/v1/tickets", ticketRouter);
 
 // Initialize cron jobs
 startRefundCronJob();
+startAutoConfirmationCronJob();
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   console.log(req.originalUrl, "error");

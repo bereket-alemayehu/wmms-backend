@@ -1,6 +1,7 @@
 import { RequestHandler, Request, Response, NextFunction } from "express";
 import factory from "../dbOperations/dbFactory";
 import Refund from "../models/refund.model";
+import Ticket from "../models/ticket.model";
 import { AppError } from "../utils/appError";
 import { catchAsync } from "../utils/catchAsync";
 import APIFeatures from "../utils/apiFeatures";
@@ -60,6 +61,88 @@ export const getRefund: RequestHandler = factory.getOne(
   { path: "ticketId customerId officeId" } as any
 );
 export const createRefund: RequestHandler = factory.createOne(Refund);
-export const updateRefund: RequestHandler = factory.updateOne(Refund);
+
+// Custom updateRefund controller with ticket status validation
+export const updateRefund: RequestHandler = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    // Get the refund
+    const refund = await Refund.findById(id).populate("ticketId");
+    if (!refund) {
+      return next(new AppError("Refund not found", 404));
+    }
+
+    // If trying to approve, check if ticket is Closed
+    if (status === "Approved") {
+      const ticket = await Ticket.findById(refund.ticketId);
+      if (!ticket) {
+        return next(new AppError("Associated ticket not found", 404));
+      }
+
+      if (ticket.status !== "Closed") {
+        return next(new AppError(
+          "Refund can only be approved when the ticket status is 'Closed'",
+          400
+        ));
+      }
+    }
+
+    // Update the refund
+    const updatedRefund = await Refund.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true, runValidators: true }
+    ).populate([
+      { path: "ticketId", select: "category status description createdAt" },
+      { path: "customerId", select: "fullName email phoneNumber" },
+      { path: "officeId", select: "branchName location" },
+    ]);
+
+    if (!updatedRefund) {
+      return next(new AppError("Failed to update refund", 500));
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        document: updatedRefund,
+      },
+    });
+  }
+);
+
+// Check if refund can be approved
+export const checkRefundApprovalEligibility: RequestHandler = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+
+    const refund = await Refund.findById(id);
+    if (!refund) {
+      return next(new AppError("Refund not found", 404));
+    }
+
+    const ticket = await Ticket.findById(refund.ticketId);
+    if (!ticket) {
+      return next(new AppError("Associated ticket not found", 404));
+    }
+
+    const canApprove = ticket.status === "Closed" && refund.status === "Requested";
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        canApprove,
+        ticketStatus: ticket.status,
+        refundStatus: refund.status,
+        message: canApprove
+          ? "Refund can be approved"
+          : `Refund cannot be approved. Ticket status: ${ticket.status}, Refund status: ${refund.status}`,
+      },
+    });
+  }
+);
+
 export const deleteRefund: RequestHandler = factory.deleteOne(Refund);
 

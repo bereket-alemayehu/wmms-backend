@@ -15,6 +15,8 @@ import {
   getOfficeQueueStatistics,
   submitTicketFeedback,
   requestTicketRefund,
+  confirmTicketResolution,
+  markTicketNotResolved,
 } from "../controllers/ticket.controller";
 import { protectUser, restrictTo } from "../middlewares/auth.middleware";
 
@@ -61,6 +63,8 @@ router.get("/office/statistics", restrictTo("supervisor", "manager"), getOfficeQ
 // Custom routes: Feedback and Refunds
 router.post("/:id/feedback", submitTicketFeedback);
 router.post("/:id/request-refund", requestTicketRefund);
+router.post("/:id/confirm-resolution", restrictTo("customer"), confirmTicketResolution);
+router.post("/:id/not-resolved", restrictTo("customer"), markTicketNotResolved);
 
 export default router;
 

@@ -5,6 +5,7 @@ import {
   createRefund,
   updateRefund,
   deleteRefund,
+  checkRefundApprovalEligibility,
 } from "../controllers/refund.controller";
 import { protectUser, restrictTo } from "../middlewares/auth.middleware";
 
@@ -28,5 +29,8 @@ router
   .get(restrictTo("customer", "manager"), getRefund)
   .patch(restrictTo("manager"), updateRefund)
   .delete(restrictTo("manager"), deleteRefund);
+
+// Check if refund can be approved
+router.get("/:id/can-approve", restrictTo("manager"), checkRefundApprovalEligibility);
 
 export default router;
