@@ -8,9 +8,14 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "nodemon --exec ts-node server.ts",
-    "watch": "tsc --watch"
+    "watch": "tsc --watch",
+    "seed": "ts-node src/seeders/index.ts",
+    "seed:offices": "ts-node src/seeders/office.seeder.ts",
+    "seed:users": "ts-node src/seeders/user.seeder.ts"
   },
   "dependencies": {
+    "@getbrevo/brevo": "^3.0.1",
+    "@types/nodemailer": "^7.0.5",
     "bcrypt": "^6.0.0",
     "body-parser": "^1.19.0",
     "compression": "^1.8.1",
@@ -26,6 +31,7 @@
     "mongodb": "^7.0.0",
     "mongoose": "^9.0.1",
     "morgan": "^1.10.1",
+    "nodemailer": "^7.0.12",
     "socket.io": "^4.8.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",

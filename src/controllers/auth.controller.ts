@@ -6,7 +6,6 @@ import { AppError } from "../utils/appError";
 import {
     createSendToken,
     signToken,
-    signRefreshToken,
     verifyToken,
     hashToken,
     validateServiceNumber,
@@ -17,7 +16,7 @@ import {
     getPasswordFeedback,
     isValidEmail,
 } from "../utils/validation.utils";
-import { sendOTP, formatPhoneNumber } from "../utils/sms.utils";
+import { sendOTPEmail, sendPasswordResetEmail } from "../services/OTPEmail";
 import {
     verifyServiceNumber as ispVerifyServiceNumber,
     getCustomerInfo,
@@ -27,7 +26,7 @@ import {
 /**
  * STEP 1: INITIATE CUSTOMER SIGNUP
  * Customer provides service number
- * Backend verifies in ISP database, generates OTP, sends via SMS
+ * Backend verifies in ISP database, finds email, generates OTP, sends via email
  */
 export const initiateSignup: RequestHandler = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
@@ -111,21 +110,37 @@ export const initiateSignup: RequestHandler = catchAsync(
             );
         }
 
+        // Check if email exists in customer info
+        if (!customerInfo.email) {
+            return next(
+                new AppError("Email address not found for this service number. Please contact support.", 404)
+            );
+        }
+
+        // Validate email format from customer info
+        if (!isValidEmail(customerInfo.email)) {
+            return next(
+                new AppError("Invalid email address on file. Please contact support.", 400)
+            );
+        }
+
         // Create or update user (for OTP tracking)
         if (!user) {
             user = await User.create({
                 serviceNumber: upperServiceNumber,
                 phoneNumber: customerInfo.phoneNumber,
                 fullName: customerInfo.fullName || "Customer",
+                email: customerInfo.email.toLowerCase().trim(),
                 role: "customer",
                 password,
                 passwordConfirm,
                 isRegistrationComplete: false
             });
         } else {
-            // Update password for existing but non-completed registration
+            // Update password and email for existing but non-completed registration
             user.password = password;
             user.passwordConfirm = passwordConfirm;
+            user.email = customerInfo.email.toLowerCase().trim();
             await user.save();
         }
 
@@ -133,25 +148,25 @@ export const initiateSignup: RequestHandler = catchAsync(
         const otp = user.generateOTP();
         await user.save({ validateBeforeSave: false });
 
-        // Send OTP via SMS
-        const formattedPhone = formatPhoneNumber(customerInfo.phoneNumber);
-        const smsSent = await sendOTP(formattedPhone, otp);
+        // Send OTP via Email to the stored email address
+        const emailSent = await sendOTPEmail(user.email!, otp, user.fullName);
 
-        if (!smsSent) {
+        if (!emailSent) {
             return next(
-                new AppError("Failed to send OTP. Please try again later.", 500)
+                new AppError("Failed to send OTP email. Please try again later.", 500)
             );
         }
 
+        // Mask email for response
+        const emailParts = user.email!.split('@');
+        const maskedEmail = emailParts[0].substring(0, 2) + '***' + '@' + emailParts[1];
+
         res.status(200).json({
             status: "success",
-            message: `OTP sent to ${customerInfo.phoneNumber.replace(
-                /(\d{3})\d{4}(\d{3})/,
-                "$1****$2"
-            )}. Valid for 5 minutes.`,
+            message: `OTP sent to ${maskedEmail}. Valid for 5 minutes.`,
             data: {
                 fullName: customerInfo.fullName,
-                phoneNumber: customerInfo.phoneNumber.replace(/(\d{3})\d{4}(\d{3})/, "$1****$2")
+                email: maskedEmail
             }
         });
     }
@@ -159,12 +174,12 @@ export const initiateSignup: RequestHandler = catchAsync(
 
 /**
  * STEP 2: VERIFY OTP & COMPLETE SIGNUP
- * Customer enters OTP received via SMS
+ * Customer enters OTP received via email
  * Backend verifies OTP and completes registration
  */
 export const verifyOTP: RequestHandler = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
-        const { serviceNumber, otp, email } = req.body;
+        const { serviceNumber, otp } = req.body;
 
         // Validate required fields
         if (!serviceNumber || !otp) {
@@ -191,16 +206,8 @@ export const verifyOTP: RequestHandler = catchAsync(
             );
         }
 
-        // Validate email if provided
-        if (email && !isValidEmail(email)) {
-            return next(new AppError("Invalid email format", 400));
-        }
-
         // Mark OTP as verified and complete signup
         user.clearOTP();
-
-        // Update user details
-        if (email) user.email = email;
         user.otpVerified = false; // Reset for future use
         user.isRegistrationComplete = true; // Mark as fully registered
 
@@ -230,7 +237,7 @@ export const login: RequestHandler = catchAsync(
         // Find user and include password field
         const user = await User.findOne({
             serviceNumber: serviceNumber.toUpperCase(),
-        }).select("+password +loginAttempts +accountLocked +lockUntil");
+        }).select("+password");
 
         if (!user) {
             return next(new AppError("Invalid service number or password", 401));
@@ -246,40 +253,12 @@ export const login: RequestHandler = catchAsync(
             );
         }
 
-        // Check if account is locked
-        if (user.accountLocked) {
-            if (user.lockUntil && user.lockUntil > new Date()) {
-                const minutesLeft = Math.ceil(
-                    (user.lockUntil.getTime() - Date.now()) / 60000
-                );
-                return next(
-                    new AppError(
-                        `Account is locked due to multiple failed login attempts. Try again in ${minutesLeft} minutes`,
-                        423
-                    )
-                );
-            } else {
-                // Lock expired, reset
-                await user.resetLoginAttempts();
-            }
-        }
-
         // Verify password
         const isPasswordCorrect = await user.comparePassword(password);
 
         if (!isPasswordCorrect) {
-            // Increment login attempts
-            await user.incrementLoginAttempts();
             return next(new AppError("Invalid service number or password", 401));
         }
-
-        // Reset login attempts on successful login
-        await user.resetLoginAttempts();
-
-        // Update refresh token in database
-        const refreshToken = signRefreshToken(user._id);
-        user.refreshToken = refreshToken;
-        await user.save({ validateBeforeSave: false });
 
         // Generate tokens and send response
         createSendToken(user, 200, res, "Logged in successfully");
@@ -292,18 +271,8 @@ export const login: RequestHandler = catchAsync(
  */
 export const logout: RequestHandler = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
-        // Clear refresh token from database
-        if (req.user) {
-            req.user.refreshToken = undefined;
-            await req.user.save({ validateBeforeSave: false });
-        }
-
         // Clear cookies
         res.cookie("jwt", "loggedout", {
-            expires: new Date(Date.now() + 10 * 1000),
-            httpOnly: true,
-        });
-        res.cookie("refreshToken", "loggedout", {
             expires: new Date(Date.now() + 10 * 1000),
             httpOnly: true,
         });
@@ -316,55 +285,8 @@ export const logout: RequestHandler = catchAsync(
 );
 
 /**
- * REFRESH TOKEN
- * Issue new access token using refresh token
- */
-export const refreshToken: RequestHandler = catchAsync(
-    async (req: Request, res: Response, next: NextFunction) => {
-        // Get refresh token from cookie or body
-        let refreshToken = req.cookies.refreshToken;
-        if (!refreshToken && req.body.refreshToken) {
-            refreshToken = req.body.refreshToken;
-        }
-
-        if (!refreshToken) {
-            return next(new AppError("Refresh token not provided", 401));
-        }
-
-        // Verify refresh token
-        let decoded;
-        try {
-            decoded = await verifyToken(refreshToken, true);
-        } catch (err) {
-            return next(new AppError("Invalid or expired refresh token", 401));
-        }
-
-        // Find user and verify refresh token matches
-        const user = await User.findById(decoded.id).select("+refreshToken");
-        if (!user) {
-            return next(new AppError("User no longer exists", 401));
-        }
-
-        if (user.refreshToken !== refreshToken) {
-            return next(new AppError("Invalid refresh token", 401));
-        }
-
-        // Generate new access token
-        const newAccessToken = signToken(user._id);
-
-        // Send new access token
-        res.status(200).json({
-            status: "success",
-            message: "Token refreshed successfully",
-            accessToken: newAccessToken,
-        });
-    }
-);
-
-/**
  * FORGOT PASSWORD
- * Generate password reset token
- * Note: For now, token is logged to console (email integration can be added later)
+ * Generate password reset token and send via email
  */
 export const forgotPassword: RequestHandler = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
@@ -383,23 +305,74 @@ export const forgotPassword: RequestHandler = catchAsync(
             return next(new AppError("No user found with that service number", 404));
         }
 
+        // Check if user has an email
+        if (!user.email) {
+            return next(
+                new AppError(
+                    "No email address found for this account. Please contact support.",
+                    400
+                )
+            );
+        }
+
         // Generate reset token
         const resetToken = user.createPasswordResetToken();
         await user.save({ validateBeforeSave: false });
 
-        // TODO: Send email with reset link
-        // For now, log to console (development only)
-        console.log("\n=== PASSWORD RESET TOKEN ===");
-        console.log(`Service Number: ${user.serviceNumber}`);
-        console.log(`Reset Token: ${resetToken}`);
-        console.log(`Use this URL: /api/v1/auth/reset-password/${resetToken}`);
-        console.log("============================\n");
+        // Send password reset email
+        try {
+            const emailSent = await sendPasswordResetEmail(
+                user.email,
+                resetToken,
+                user.fullName
+            );
 
-        res.status(200).json({
-            status: "success",
-            message:
-                "Password reset token generated. Check console (development mode) or contact administrator.",
-        });
+            if (!emailSent) {
+                // If email fails, still log for development but return error
+                if (process.env.NODE_ENV === 'development') {
+                    console.log("\n=== PASSWORD RESET TOKEN (Email failed) ===");
+                    console.log(`Service Number: ${user.serviceNumber}`);
+                    console.log(`Email: ${user.email}`);
+                    console.log(`Reset Token: ${resetToken}`);
+                    const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:3000';
+                    console.log(`Use this URL: ${frontendUrl}/reset-password/${resetToken}`);
+                    console.log("============================\n");
+                }
+                
+                return next(
+                    new AppError(
+                        "Failed to send password reset email. Please try again later or contact support.",
+                        500
+                    )
+                );
+            }
+
+            res.status(200).json({
+                status: "success",
+                message: "Password reset link has been sent to your email address.",
+            });
+        } catch (error) {
+            // Log error but don't expose details to user
+            console.error("Error in password reset flow:", error);
+            
+            // In development, still log the token
+            if (process.env.NODE_ENV === 'development') {
+                console.log("\n=== PASSWORD RESET TOKEN (Fallback) ===");
+                console.log(`Service Number: ${user.serviceNumber}`);
+                console.log(`Email: ${user.email}`);
+                console.log(`Reset Token: ${resetToken}`);
+                const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:3000';
+                console.log(`Use this URL: ${frontendUrl}/reset-password/${resetToken}`);
+                console.log("============================\n");
+            }
+
+            return next(
+                new AppError(
+                    "Failed to send password reset email. Please try again later.",
+                    500
+                )
+            );
+        }
     }
 );
 

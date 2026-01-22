@@ -12,6 +12,7 @@ import userRouter from "./routes/user.routes";
 import officeRouter from "./routes/office.routes";
 import refundRouter from "./routes/refund.routes";
 import outageRouter from "./routes/outage.routes";
+import ticketRouter from "./routes/ticket.routes";
 import swaggerUI from "swagger-ui-express";
 import swaggerSpec from "./swagger";
 import authRouter from "./routes/auth.routes";
@@ -22,6 +23,7 @@ import { sanitizeInputs } from "./middlewares/middleware";
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
+  "http://localhost:3001",
   "http://localhost:3000",
   "http://192.168.0.112:3000",
   "https://addisbroker.tetertechs.com",
@@ -68,13 +70,14 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.use(sanitizeInputs);
 app.use(compression());
 
-const limiter = rateLimit({
-  max: 100000,
-  windowMs: 60 * 60 * 1000,
-  message: "Too many request! Try again after an hour",
-});
+// const limiter = rateLimit({
+//   max: 100000,
+//   windowMs: 60 * 60 * 1000,
+//   message: "Too many request! Try again after an hour",
+// });
 
-app.use(limiter);
+// app.use(limiter);
+
 app.use(cookieParser());
 app.use(
   express.urlencoded({
@@ -88,6 +91,7 @@ app.use("/api/v1/users", userRouter);
 app.use("/api/v1/offices", officeRouter);
 app.use("/api/v1/refunds", refundRouter);
 app.use("/api/v1/outages", outageRouter);
+app.use("/api/v1/tickets", ticketRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   console.log(req.originalUrl, "error");
