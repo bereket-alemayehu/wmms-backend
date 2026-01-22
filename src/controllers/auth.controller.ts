@@ -6,7 +6,6 @@ import { AppError } from "../utils/appError";
 import {
     createSendToken,
     signToken,
-    signRefreshToken,
     verifyToken,
     hashToken,
     validateServiceNumber,
@@ -261,11 +260,6 @@ export const login: RequestHandler = catchAsync(
             return next(new AppError("Invalid service number or password", 401));
         }
 
-        // Update refresh token in database
-        const refreshToken = signRefreshToken(user._id);
-        user.refreshToken = refreshToken;
-        await user.save({ validateBeforeSave: false });
-
         // Generate tokens and send response
         createSendToken(user, 200, res, "Logged in successfully");
     }
@@ -277,18 +271,8 @@ export const login: RequestHandler = catchAsync(
  */
 export const logout: RequestHandler = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
-        // Clear refresh token from database
-        if (req.user) {
-            req.user.refreshToken = undefined;
-            await req.user.save({ validateBeforeSave: false });
-        }
-
         // Clear cookies
         res.cookie("jwt", "loggedout", {
-            expires: new Date(Date.now() + 10 * 1000),
-            httpOnly: true,
-        });
-        res.cookie("refreshToken", "loggedout", {
             expires: new Date(Date.now() + 10 * 1000),
             httpOnly: true,
         });
@@ -296,52 +280,6 @@ export const logout: RequestHandler = catchAsync(
         res.status(200).json({
             status: "success",
             message: "Logged out successfully",
-        });
-    }
-);
-
-/**
- * REFRESH TOKEN
- * Issue new access token using refresh token
- */
-export const refreshToken: RequestHandler = catchAsync(
-    async (req: Request, res: Response, next: NextFunction) => {
-        // Get refresh token from cookie or body
-        let refreshToken = req.cookies.refreshToken;
-        if (!refreshToken && req.body.refreshToken) {
-            refreshToken = req.body.refreshToken;
-        }
-
-        if (!refreshToken) {
-            return next(new AppError("Refresh token not provided", 401));
-        }
-
-        // Verify refresh token
-        let decoded;
-        try {
-            decoded = await verifyToken(refreshToken, true);
-        } catch (err) {
-            return next(new AppError("Invalid or expired refresh token", 401));
-        }
-
-        // Find user and verify refresh token matches
-        const user = await User.findById(decoded.id).select("+refreshToken");
-        if (!user) {
-            return next(new AppError("User no longer exists", 401));
-        }
-
-        if (user.refreshToken !== refreshToken) {
-            return next(new AppError("Invalid refresh token", 401));
-        }
-
-        // Generate new access token
-        const newAccessToken = signToken(user._id);
-
-        // Send new access token
-        res.status(200).json({
-            status: "success",
-            message: "Token refreshed successfully",
-            accessToken: newAccessToken,
         });
     }
 );
