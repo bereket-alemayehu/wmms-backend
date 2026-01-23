@@ -13,6 +13,9 @@ import {
   getOfficeTickets,
   getTechnicianTickets,
   getOfficeQueueStatistics,
+  getTechnicianStatistics,
+  getSystemAnalyticsController,
+  getTopRatedTechniciansController,
   submitTicketFeedback,
   requestTicketRefund,
   confirmTicketResolution,
@@ -34,13 +37,16 @@ router
   )
   .post(createTicket); // Customers can create tickets
 
-router
-  .route("/:id")
-  .get(getTicket) // All authenticated users can view tickets
-  .patch(restrictTo("supervisor", "manager", "technician"), updateTicket)
-  .delete(restrictTo("manager"), deleteTicket);
+// Custom routes: Filtered views (must come before /:id routes)
+router.get("/customer/my-tickets", getCustomerTickets);
+router.get("/office/tickets", restrictTo("supervisor", "manager"), getOfficeTickets);
+router.get("/technician/my-tickets", restrictTo("technician"), getTechnicianTickets);
+router.get("/technician/statistics", restrictTo("technician"), getTechnicianStatistics);
+router.get("/office/statistics", restrictTo("supervisor", "manager"), getOfficeQueueStatistics);
+router.get("/analytics", restrictTo("manager"), getSystemAnalyticsController);
+router.get("/top-rated-technicians", restrictTo("manager"), getTopRatedTechniciansController);
 
-// Custom routes: Queue and Status
+// Custom routes: Queue and Status (must come before /:id route)
 router.get("/:id/queue-position", getTicketQueuePosition);
 router.get("/:id/refund-eligibility", checkTicketRefundEligibility);
 router.patch(
@@ -54,11 +60,12 @@ router.patch(
   changeTicketStatus
 );
 
-// Custom routes: Filtered views
-router.get("/customer/my-tickets", getCustomerTickets);
-router.get("/office/tickets", restrictTo("supervisor", "manager"), getOfficeTickets);
-router.get("/technician/my-tickets", restrictTo("technician"), getTechnicianTickets);
-router.get("/office/statistics", restrictTo("supervisor", "manager"), getOfficeQueueStatistics);
+// Basic CRUD routes with ID (must come last)
+router
+  .route("/:id")
+  .get(getTicket) // All authenticated users can view tickets
+  .patch(restrictTo("supervisor", "manager", "technician"), updateTicket)
+  .delete(restrictTo("manager"), deleteTicket);
 
 // Custom routes: Feedback and Refunds
 router.post("/:id/feedback", submitTicketFeedback);

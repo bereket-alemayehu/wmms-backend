@@ -194,6 +194,224 @@ export const getQueueStatistics = async (
 };
 
 /**
+ * Get technician statistics
+ * Returns counts of assigned, in progress, and completed today tickets
+ */
+export const getTechnicianStatistics = async (
+  technicianId: string | Types.ObjectId
+): Promise<{
+  assigned: number;
+  inProgress: number;
+  completedToday: number;
+  total: number;
+}> => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const [assigned, inProgress, completedToday, total] = await Promise.all([
+    Ticket.countDocuments({ assignedTo: technicianId, status: "Assigned" }),
+    Ticket.countDocuments({ assignedTo: technicianId, status: "In Progress" }),
+    Ticket.countDocuments({
+      assignedTo: technicianId,
+      status: { $in: ["Resolved", "Closed"] },
+      updatedAt: { $gte: today, $lt: tomorrow },
+    }),
+    Ticket.countDocuments({ assignedTo: technicianId }),
+  ]);
+
+  return {
+    assigned,
+    inProgress,
+    completedToday,
+    total,
+  };
+};
+
+/**
+ * Get system-wide analytics
+ * Returns comprehensive analytics for managers
+ */
+export const getSystemAnalytics = async (): Promise<{
+  totalTickets: number;
+  resolvedTickets: number;
+  pendingTickets: number;
+  inProgressTickets: number;
+  assignedTickets: number;
+  closedTickets: number;
+  resolutionRate: number;
+  ticketsByCategory: {
+    category: string;
+    count: number;
+    percentage: number;
+  }[];
+  ticketsByStatus: {
+    status: string;
+    count: number;
+  }[];
+  technicianPerformance: {
+    technicianId: string;
+    fullName: string;
+    activeCount: number;
+    resolvedThisMonth: number;
+  }[];
+}> => {
+  // Get all tickets
+  const allTickets = await Ticket.find({});
+  const totalTickets = allTickets.length;
+
+  // Calculate status counts
+  const pendingTickets = allTickets.filter((t) => t.status === "Pending").length;
+  const assignedTickets = allTickets.filter((t) => t.status === "Assigned").length;
+  const inProgressTickets = allTickets.filter((t) => t.status === "In Progress").length;
+  const resolvedTickets = allTickets.filter((t) => t.status === "Resolved").length;
+  const closedTickets = allTickets.filter((t) => t.status === "Closed").length;
+  const resolvedCount = resolvedTickets + closedTickets;
+
+  // Calculate resolution rate
+  const resolutionRate = totalTickets > 0 ? Math.round((resolvedCount / totalTickets) * 100) : 0;
+
+  // Tickets by category
+  const categories = ["No Connection", "Speed Issue", "Hardware Fault", "Other"];
+  const ticketsByCategory = categories.map((category) => {
+    const count = allTickets.filter((t) => t.category === category).length;
+    const percentage = totalTickets > 0 ? Math.round((count / totalTickets) * 100) : 0;
+    return { category, count, percentage };
+  });
+
+  // Tickets by status
+  const ticketsByStatus = [
+    { status: "Pending", count: pendingTickets },
+    { status: "Assigned", count: assignedTickets },
+    { status: "In Progress", count: inProgressTickets },
+    { status: "Resolved", count: resolvedTickets },
+    { status: "Closed", count: closedTickets },
+  ];
+
+  // Technician performance
+  const User = (await import("../models/user.model")).default;
+  const technicians = await User.find({ role: "technician" }).select("_id fullName");
+  
+  const thisMonthStart = new Date();
+  thisMonthStart.setDate(1);
+  thisMonthStart.setHours(0, 0, 0, 0);
+
+  const technicianPerformance = await Promise.all(
+    technicians.map(async (tech) => {
+      const techId = tech._id.toString();
+      
+      const activeTickets = await Ticket.countDocuments({
+        assignedTo: techId,
+        status: { $in: ["Assigned", "In Progress"] },
+      });
+
+      const resolvedThisMonth = await Ticket.countDocuments({
+        assignedTo: techId,
+        status: { $in: ["Resolved", "Closed"] },
+        updatedAt: { $gte: thisMonthStart },
+      });
+
+      return {
+        technicianId: techId,
+        fullName: tech.fullName,
+        activeCount: activeTickets,
+        resolvedThisMonth,
+      };
+    })
+  );
+
+  return {
+    totalTickets,
+    resolvedTickets: resolvedCount,
+    pendingTickets,
+    inProgressTickets,
+    assignedTickets,
+    closedTickets,
+    resolutionRate,
+    ticketsByCategory,
+    ticketsByStatus,
+    technicianPerformance,
+  };
+};
+
+/**
+ * Get top-rated technicians
+ * Returns technicians sorted by average rating, with at least one rating
+ * Gets ratings from tickets that are assigned to technicians
+ */
+export const getTopRatedTechnicians = async (limit: number = 3): Promise<{
+  technicianId: string;
+  fullName: string;
+  averageRating: number;
+  ratingCount: number;
+}[]> => {
+  const User = (await import("../models/user.model")).default;
+  
+  // Get all tickets that have ratings and are assigned to technicians
+  const ratedTickets = await Ticket.find({
+    rating: { $exists: true, $ne: null },
+    assignedTo: { $exists: true, $ne: null },
+  }).select("assignedTo rating");
+  
+  if (ratedTickets.length === 0) {
+    return [];
+  }
+  
+  // Group tickets by technician ID and calculate averages
+  const technicianRatingsMap = new Map<string, { ratings: number[]; technicianId: string }>();
+  
+  for (const ticket of ratedTickets) {
+    if (!ticket.assignedTo || !ticket.rating || typeof ticket.rating !== 'number') continue;
+    
+    const techId = typeof ticket.assignedTo === 'string' 
+      ? ticket.assignedTo 
+      : ticket.assignedTo.toString();
+    
+    if (!technicianRatingsMap.has(techId)) {
+      technicianRatingsMap.set(techId, { ratings: [], technicianId: techId });
+    }
+    
+    technicianRatingsMap.get(techId)!.ratings.push(ticket.rating);
+  }
+  
+  // Get technician details and calculate averages
+  const technicianRatings = await Promise.all(
+    Array.from(technicianRatingsMap.entries()).map(async ([techId, data]) => {
+      const technician = await User.findById(techId).select("fullName");
+      
+      if (!technician) {
+        return null;
+      }
+      
+      const ratings = data.ratings;
+      const totalRating = ratings.reduce((sum, rating) => sum + rating, 0);
+      const averageRating = totalRating / ratings.length;
+      
+      return {
+        technicianId: techId,
+        fullName: technician.fullName,
+        averageRating: Math.round(averageRating * 10) / 10, // Round to 1 decimal
+        ratingCount: ratings.length,
+      };
+    })
+  );
+  
+  // Filter out nulls, sort by average rating (descending), then by count (descending), and limit
+  return technicianRatings
+    .filter((rating): rating is NonNullable<typeof rating> => rating !== null)
+    .sort((a, b) => {
+      // Sort by average rating first (descending)
+      if (b.averageRating !== a.averageRating) {
+        return b.averageRating - a.averageRating;
+      }
+      // Then by rating count (descending)
+      return b.ratingCount - a.ratingCount;
+    })
+    .slice(0, limit);
+};
+
+/**
  * Submit feedback for a closed ticket
  */
 export const submitFeedback = async (

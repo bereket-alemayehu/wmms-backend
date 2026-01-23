@@ -10,6 +10,9 @@ import {
   getTicketsByOffice,
   getTicketsByTechnician,
   getQueueStatistics,
+  getTechnicianStatistics as getTechnicianStatisticsService,
+  getSystemAnalytics,
+  getTopRatedTechnicians,
   submitFeedback,
   requestRefund,
 } from "../services/ticket.service";
@@ -395,6 +398,74 @@ export const getOfficeQueueStatistics: RequestHandler = catchAsync(
       status: "success",
       data: {
         statistics,
+      },
+    });
+  }
+);
+
+// Custom controller: Get technician statistics
+export const getTechnicianStatistics: RequestHandler = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(new AppError("User not authenticated", 401));
+    }
+
+    if (req.user.role !== "technician") {
+      return next(new AppError("This endpoint is only for technicians", 403));
+    }
+
+    const technicianId = req.user._id.toString();
+    const statistics = await getTechnicianStatisticsService(technicianId);
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        statistics,
+      },
+    });
+  }
+);
+
+// Custom controller: Get system analytics
+export const getSystemAnalyticsController: RequestHandler = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(new AppError("User not authenticated", 401));
+    }
+
+    if (req.user.role !== "manager") {
+      return next(new AppError("This endpoint is only for managers", 403));
+    }
+
+    const analytics = await getSystemAnalytics();
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        analytics,
+      },
+    });
+  }
+);
+
+// Custom controller: Get top-rated technicians
+export const getTopRatedTechniciansController: RequestHandler = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(new AppError("User not authenticated", 401));
+    }
+
+    if (req.user.role !== "manager") {
+      return next(new AppError("This endpoint is only for managers", 403));
+    }
+
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 3;
+    const topRated = await getTopRatedTechnicians(limit);
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        technicians: topRated,
       },
     });
   }
