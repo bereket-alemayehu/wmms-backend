@@ -16,9 +16,16 @@ import {
   submitFeedback,
   requestRefund,
 } from "../services/ticket.service";
+import {
+  notifyTicketAssigned,
+  notifyTicketResolved,
+  notifyTicketClosed,
+  notifyTicketUnresolved,
+} from "../services/notification.service";
 import { AppError } from "../utils/appError";
 import { catchAsync } from "../utils/catchAsync";
 import { TicketStatus } from "../interfaces/ticket.interface";
+import User from "../models/user.model";
 
 // Custom getAllTickets controller that filters by logged-in user's officeId
 export const getAllTickets: RequestHandler = catchAsync(
@@ -163,6 +170,24 @@ export const createTicket: RequestHandler = catchAsync(
 
     const ticket = await Ticket.create(req.body);
 
+    // Notify technician if ticket was assigned
+    // Ticket.create with a single object returns a single document
+    const ticketDoc = Array.isArray(ticket) ? ticket[0] : ticket;
+    if (ticketDoc.assignedTo && ticketDoc.status === "Assigned") {
+      const io = globalThis.io;
+      // Extract technician ID - could be ObjectId or populated object
+      const technicianId = typeof ticketDoc.assignedTo === "string" 
+        ? ticketDoc.assignedTo 
+        : (ticketDoc.assignedTo as any)._id?.toString() || ticketDoc.assignedTo.toString();
+      
+      await notifyTicketAssigned(
+        technicianId,
+        ticketDoc._id,
+        ticketDoc.category,
+        io
+      );
+    }
+
     res.status(201).json({
       status: "success",
       data: {
@@ -237,6 +262,15 @@ export const assignTicketToTechnician: RequestHandler = catchAsync(
       return next(new AppError("Ticket not found", 404));
     }
 
+    // Notify technician
+    const io = globalThis.io;
+    await notifyTicketAssigned(
+      technicianId,
+      ticket._id,
+      ticket.category,
+      io
+    );
+
     res.status(200).json({
       status: "success",
       data: {
@@ -289,6 +323,21 @@ export const changeTicketStatus: RequestHandler = catchAsync(
 
     if (!updatedTicket) {
       return next(new AppError("Failed to update ticket status", 500));
+    }
+
+    // Notify customer if ticket is resolved
+    if (status === "Resolved" && updatedTicket.customerId) {
+      const io = globalThis.io;
+      // Extract customer ID - could be ObjectId or populated object
+      const customerId = typeof updatedTicket.customerId === "string" 
+        ? updatedTicket.customerId 
+        : (updatedTicket.customerId as any)._id?.toString() || updatedTicket.customerId.toString();
+      
+      await notifyTicketResolved(
+        customerId,
+        updatedTicket._id,
+        io
+      );
     }
 
     res.status(200).json({
@@ -552,6 +601,15 @@ export const confirmTicketResolution: RequestHandler = catchAsync(
       return next(new AppError("Failed to confirm ticket resolution", 500));
     }
 
+    // Notify all managers
+    const io = globalThis.io;
+    const managers = await User.find({ role: "manager" }).select("_id");
+    const managerIds = managers.map((m) => m._id.toString());
+    
+    if (managerIds.length > 0) {
+      await notifyTicketClosed(managerIds, updatedTicket._id, io);
+    }
+
     res.status(200).json({
       status: "success",
       message: "Ticket resolution confirmed successfully",
@@ -593,6 +651,42 @@ export const markTicketNotResolved: RequestHandler = catchAsync(
 
     if (!updatedTicket) {
       return next(new AppError("Failed to mark ticket as not resolved", 500));
+    }
+
+    // Notify technician and supervisor
+    const io = globalThis.io;
+    if (updatedTicket.assignedTo) {
+      // Get supervisor from the office
+      const Office = (await import("../models/office.model")).default;
+      const office = await Office.findById(updatedTicket.officeId);
+      
+      // Find supervisor in the same office
+      const supervisor = await User.findOne({
+        officeId: updatedTicket.officeId,
+        role: "supervisor",
+      });
+
+      if (supervisor) {
+        // Extract technician ID - could be ObjectId or populated object
+        const technicianId = typeof updatedTicket.assignedTo === "string" 
+          ? updatedTicket.assignedTo 
+          : (updatedTicket.assignedTo as any)._id?.toString() || updatedTicket.assignedTo.toString();
+        
+        await notifyTicketUnresolved(
+          technicianId,
+          supervisor._id.toString(),
+          updatedTicket._id,
+          io
+        );
+      } else {
+        // If no supervisor, just notify technician
+        await notifyTicketAssigned(
+          updatedTicket.assignedTo,
+          updatedTicket._id,
+          updatedTicket.category,
+          io
+        );
+      }
     }
 
     res.status(200).json({

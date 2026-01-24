@@ -3,6 +3,10 @@ import factory from "../dbOperations/dbFactory";
 import Outage from "../models/outage.model";
 import { AppError } from "../utils/appError";
 import { catchAsync } from "../utils/catchAsync";
+import {
+  notifyOutageCreated,
+  notifyOutageResolved,
+} from "../services/notification.service";
 
 // Custom getAllOutages controller to properly populate office
 export const getAllOutages: RequestHandler = catchAsync(
@@ -87,6 +91,15 @@ export const createOutage: RequestHandler = catchAsync(
       return next(new AppError("Failed to create outage", 500));
     }
 
+    // Notify all users in the office
+    const io = globalThis.io;
+    await notifyOutageCreated(
+      outage.officeId,
+      outage._id,
+      outage.title,
+      io
+    );
+
     res.status(201).json({
       status: "success",
       data: {
@@ -115,6 +128,17 @@ export const updateOutage: RequestHandler = catchAsync(
       { path: "officeId", select: "cityName branchName location" },
       { path: "postedBy", select: "fullName email" },
     ]);
+
+    // Notify if outage status changed to Resolved
+    if (req.body.status === "Resolved" && document.status === "Resolved") {
+      const io = globalThis.io;
+      await notifyOutageResolved(
+        document.officeId,
+        document._id,
+        document.title,
+        io
+      );
+    }
 
     res.status(200).json({
       status: "success",
