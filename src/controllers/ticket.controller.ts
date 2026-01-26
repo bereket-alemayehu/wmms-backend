@@ -22,6 +22,7 @@ import {
   notifyTicketClosed,
   notifyTicketUnresolved,
 } from "../services/notification.service";
+import { detectAndCreateOutage } from "../services/outage.service";
 import { AppError } from "../utils/appError";
 import { catchAsync } from "../utils/catchAsync";
 import { TicketStatus } from "../interfaces/ticket.interface";
@@ -176,10 +177,10 @@ export const createTicket: RequestHandler = catchAsync(
     if (ticketDoc.assignedTo && ticketDoc.status === "Assigned") {
       const io = globalThis.io;
       // Extract technician ID - could be ObjectId or populated object
-      const technicianId = typeof ticketDoc.assignedTo === "string" 
-        ? ticketDoc.assignedTo 
+      const technicianId = typeof ticketDoc.assignedTo === "string"
+        ? ticketDoc.assignedTo
         : (ticketDoc.assignedTo as any)._id?.toString() || ticketDoc.assignedTo.toString();
-      
+
       await notifyTicketAssigned(
         technicianId,
         ticketDoc._id,
@@ -187,6 +188,11 @@ export const createTicket: RequestHandler = catchAsync(
         io
       );
     }
+
+    // Trigger mass outage detection
+    detectAndCreateOutage(ticketDoc.officeId).catch(err =>
+      console.error("[Outage Detection Trigger Error]:", err)
+    );
 
     res.status(201).json({
       status: "success",
@@ -432,10 +438,10 @@ export const changeTicketStatus: RequestHandler = catchAsync(
     if (status === "Resolved" && updatedTicket.customerId) {
       const io = globalThis.io;
       // Extract customer ID - could be ObjectId or populated object
-      const customerId = typeof updatedTicket.customerId === "string" 
-        ? updatedTicket.customerId 
+      const customerId = typeof updatedTicket.customerId === "string"
+        ? updatedTicket.customerId
         : (updatedTicket.customerId as any)._id?.toString() || updatedTicket.customerId.toString();
-      
+
       await notifyTicketResolved(
         customerId,
         updatedTicket._id,
@@ -708,7 +714,7 @@ export const confirmTicketResolution: RequestHandler = catchAsync(
     const io = globalThis.io;
     const managers = await User.find({ role: "manager" }).select("_id");
     const managerIds = managers.map((m) => m._id.toString());
-    
+
     if (managerIds.length > 0) {
       await notifyTicketClosed(managerIds, updatedTicket._id, io);
     }
@@ -762,7 +768,7 @@ export const markTicketNotResolved: RequestHandler = catchAsync(
       // Get supervisor from the office
       const Office = (await import("../models/office.model")).default;
       const office = await Office.findById(updatedTicket.officeId);
-      
+
       // Find supervisor in the same office
       const supervisor = await User.findOne({
         officeId: updatedTicket.officeId,
@@ -771,10 +777,10 @@ export const markTicketNotResolved: RequestHandler = catchAsync(
 
       if (supervisor) {
         // Extract technician ID - could be ObjectId or populated object
-        const technicianId = typeof updatedTicket.assignedTo === "string" 
-          ? updatedTicket.assignedTo 
+        const technicianId = typeof updatedTicket.assignedTo === "string"
+          ? updatedTicket.assignedTo
           : (updatedTicket.assignedTo as any)._id?.toString() || updatedTicket.assignedTo.toString();
-        
+
         await notifyTicketUnresolved(
           technicianId,
           supervisor._id.toString(),
