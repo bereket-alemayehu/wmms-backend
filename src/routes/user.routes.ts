@@ -27,8 +27,8 @@ router.get("/customers", restrictTo("manager", "technician"), getCustomersByOffi
 // General user routes
 // Only managers can get all users
 router.get("/", restrictTo("manager"), getAllUsers);
-// Only managers can create users
-router.post("/", restrictTo("manager"), createUser);
+// Managers can create supervisors and technicians. Supervisors can create technicians.
+router.post("/", restrictTo("manager", "supervisor"), createUser);
 
 // Get single user - accessible to managers, supervisors, and technicians (with office filtering)
 router.get("/:id", getUser);

@@ -61,35 +61,35 @@ export const getAllTickets: RequestHandler = catchAsync(
 export const getTicket: RequestHandler = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     const { id } = req.params;
-    
+
     const ticket = await Ticket.findById(id)
       .populate("customerId", "fullName phoneNumber serviceNumber")
       .populate("officeId", "cityName branchName location")
       .populate("assignedTo", "fullName phoneNumber");
-    
+
     if (!ticket) {
       return next(new AppError("No ticket found with that ID", 404));
     }
 
     // Transform the response to match frontend expectations
     const ticketDoc = ticket.toObject();
-    
+
     // Helper function to check if a field is a populated Mongoose document object
     const isPopulatedObject = (field: any): boolean => {
       return field && typeof field === 'object' && field._id && Object.keys(field).length > 1;
     };
-    
+
     const transformedTicket = {
       ...ticketDoc,
       // Map populated fields to expected frontend field names
-      customer: isPopulatedObject(ticketDoc.customerId) 
-        ? ticketDoc.customerId 
+      customer: isPopulatedObject(ticketDoc.customerId)
+        ? ticketDoc.customerId
         : undefined,
-      office: isPopulatedObject(ticketDoc.officeId) 
-        ? ticketDoc.officeId 
+      office: isPopulatedObject(ticketDoc.officeId)
+        ? ticketDoc.officeId
         : undefined,
-      technician: isPopulatedObject(ticketDoc.assignedTo) 
-        ? ticketDoc.assignedTo 
+      technician: isPopulatedObject(ticketDoc.assignedTo)
+        ? ticketDoc.assignedTo
         : undefined,
       // Keep the IDs as strings for consistency
       customerId: isPopulatedObject(ticketDoc.customerId)
@@ -172,9 +172,112 @@ export const createTicket: RequestHandler = catchAsync(
   }
 );
 
-export const updateTicket: RequestHandler = factory.updateOne(Ticket);
+// Custom updateTicket controller with ownership and status checks
+export const updateTicket: RequestHandler = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+    const ticket = await Ticket.findById(id);
 
-export const deleteTicket: RequestHandler = factory.deleteOne(Ticket);
+    if (!ticket) {
+      return next(new AppError("No ticket found with that ID", 404));
+    }
+
+    // Role-based restrictions for customers
+    if (req.user?.role === "customer") {
+      // 1. Check ownership
+      if (ticket.customerId.toString() !== req.user._id.toString()) {
+        return next(new AppError("You can only update your own tickets", 403));
+      }
+
+      // 2. Check status (Only Pending or Assigned)
+      if (!["Pending", "Assigned"].includes(ticket.status)) {
+        return next(
+          new AppError(`You cannot update a ticket that is already ${ticket.status}`, 400)
+        );
+      }
+
+      // Customers can only update description and category
+      const allowedUpdates: any = {};
+      if (req.body.description) allowedUpdates.description = req.body.description;
+      if (req.body.category) allowedUpdates.category = req.body.category;
+
+      const updatedTicket = await Ticket.findByIdAndUpdate(id, allowedUpdates, {
+        new: true,
+        runValidators: true,
+      });
+
+      return res.status(200).json({
+        status: "success",
+        data: {
+          data: updatedTicket,
+        },
+      });
+    }
+
+    // For staff (technician, supervisor, manager)
+    // Permission check for technicians already exists in changeTicketStatus, 
+    // but here we allow general updates (except maybe status, which has its own route)
+    if (req.user?.role === "technician") {
+      if (!ticket.assignedTo || ticket.assignedTo.toString() !== req.user._id.toString()) {
+        return next(new AppError("You can only update tickets assigned to you", 403));
+      }
+    }
+
+    const updatedTicket = await Ticket.findByIdAndUpdate(id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        data: updatedTicket,
+      },
+    });
+  }
+);
+
+// Custom deleteTicket controller with ownership and status checks
+export const deleteTicket: RequestHandler = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+    const ticket = await Ticket.findById(id);
+
+    if (!ticket) {
+      return next(new AppError("No ticket found with that ID", 404));
+    }
+
+    // Role-based restrictions
+    if (req.user?.role === "customer") {
+      // 1. Check ownership
+      if (ticket.customerId.toString() !== req.user._id.toString()) {
+        return next(new AppError("You can only delete your own tickets", 403));
+      }
+
+      // 2. Check status (Only Pending or Assigned)
+      if (!["Pending", "Assigned"].includes(ticket.status)) {
+        return next(new AppError(`You can only delete tickets that are Pending or Assigned. Currently: ${ticket.status}`, 400));
+      }
+
+      // 3. Check time window (10 minutes)
+      const tenMinutes = 10 * 60 * 1000;
+      const ticketAge = Date.now() - new Date(ticket.createdAt).getTime();
+      if (ticketAge > tenMinutes) {
+        return next(new AppError("You can only delete a ticket within 10 minutes of creation", 400));
+      }
+    } else if (req.user?.role !== "manager") {
+      // Non-managers (supervisors/technicians) cannot delete tickets
+      return next(new AppError("Only managers and the ticket creator can delete tickets", 403));
+    }
+
+    await Ticket.findByIdAndDelete(id);
+
+    res.status(204).json({
+      status: "success",
+      data: null,
+    });
+  }
+);
 
 // Custom controller: Get queue position
 export const getTicketQueuePosition: RequestHandler = catchAsync(

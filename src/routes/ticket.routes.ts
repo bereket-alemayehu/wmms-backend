@@ -64,8 +64,8 @@ router.patch(
 router
   .route("/:id")
   .get(getTicket) // All authenticated users can view tickets
-  .patch(restrictTo("supervisor", "manager", "technician"), updateTicket)
-  .delete(restrictTo("manager"), deleteTicket);
+  .patch(restrictTo("supervisor", "manager", "technician", "customer"), updateTicket)
+  .delete(restrictTo("manager", "customer"), deleteTicket);
 
 // Custom routes: Feedback and Refunds
 router.post("/:id/feedback", submitTicketFeedback);

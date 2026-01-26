@@ -188,12 +188,28 @@ export const createUser: RequestHandler = catchAsync(
       return next(new AppError("User not authenticated", 401));
     }
 
-    if (!req.user.officeId) {
-      return next(new AppError("User does not have an assigned office", 400));
+    const creatorRole = req.user.role;
+    const targetRole = req.body.role;
+
+    // Hierarchy Check
+    if (creatorRole === "supervisor") {
+      if (targetRole !== "technician") {
+        return next(new AppError("Supervisors can only create technician credentials", 403));
+      }
+    } else if (creatorRole === "manager") {
+      if (!["supervisor", "technician"].includes(targetRole)) {
+        return next(new AppError("Managers can only create supervisor or technician credentials", 403));
+      }
+    } else {
+      // For any other role that might have reached here (e.g. technician if route was misconfigured)
+      return next(new AppError("You do not have permission to create user credentials", 403));
     }
 
-    // Automatically assign new staff to the same office as the creator
-    if (req.body.role === "technician" || req.body.role === "supervisor") {
+    // Office Inheritance
+    if (creatorRole === "supervisor" || (creatorRole === "manager" && !req.body.officeId)) {
+      if (!req.user.officeId) {
+        return next(new AppError("Creator does not have an assigned office", 400));
+      }
       req.body.officeId = req.user.officeId;
     }
 
