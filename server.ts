@@ -28,26 +28,76 @@ let server: http.Server;
         "http://localhost:5174",
         "http://localhost:3000",
         "http://localhost:3001",
+        "http://localhost:3002",
         "http://localhost:5000",
         "https://e8e61abdbe2e.ngrok-free.app",
       ],
       credentials: true,
+      methods: ["GET", "POST"],
+      allowedHeaders: ["Content-Type", "Authorization"],
     },
   });
 
-  io.on("connection", (socket) => {
-    console.log("New client connected:", socket.id);
+  // Socket.IO authentication middleware
+  io.use(async (socket, next) => {
+    try {
+      // Try to get token from auth object, Authorization header, or cookies
+      let token = socket.handshake.auth.token || 
+                  socket.handshake.headers.authorization?.split(" ")[1];
+      
+      // If no token in auth/header, check cookies
+      if (!token || token === "null") {
+        const cookieHeader = socket.handshake.headers.cookie;
+        if (cookieHeader) {
+          const cookies = cookieHeader.split(";").reduce((acc: Record<string, string>, cookie) => {
+            const [key, value] = cookie.trim().split("=");
+            if (key && value) {
+              acc[key] = value;
+            }
+            return acc;
+          }, {});
+          token = cookies.jwt;
+        }
+      }
+      
+      if (!token || token === "null") {
+        return next(new Error("Authentication error: No token provided"));
+      }
 
-    // Example: Notify user-specific messages
-    socket.on("joinRoom", (roomId) => {
-      socket.join(roomId);
-      console.log(`Socket ${socket.id} joined room ${roomId}`);
-    });
+      // Verify token
+      const { verifyToken } = await import("./src/utils/security.utils");
+      const User = (await import("./src/models/user.model")).default;
+      
+      const decoded = await verifyToken(token);
+      const user = await User.findById(decoded.id);
 
+      if (!user) {
+        return next(new Error("Authentication error: User not found"));
+      }
+
+      // Attach user to socket
+      (socket as any).user = user;
+      next();
+    } catch (error: any) {
+      console.error("Socket authentication error:", error.message);
+      next(new Error("Authentication error: Invalid token"));
+    }
+  });
+
+  io.on("connection", (socket: any) => {
+    const user = socket.user;
+    const userRoom = `user_${user._id}`;
+
+    // Join user-specific room for notifications
+    socket.join(userRoom);
+    console.log(`User ${user.fullName} (${user._id}) connected with socket ${socket.id}`);
+
+    // Handle disconnection
     socket.on("disconnect", () => {
-      console.log("Client disconnected:", socket.id);
+      console.log(`User ${user.fullName} (${user._id}) disconnected`);
     });
   });
+  
   globalThis.io = io;
 
   server.listen(process.env.PORT!, () => {
