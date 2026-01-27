@@ -29,7 +29,7 @@ const allowedOrigins = [
   "http://localhost:3001",
   "http://localhost:3000",
   "http://192.168.0.112:3000",
-  "https://addisbroker.tetertechs.com",
+  "https://wmms-frontend.onrender.com",
   "https://test.addisbroker.tetertechs.com",
   "https://fc47f33dcb04.ngrok-free.app",
 ];

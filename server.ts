@@ -30,7 +30,7 @@ let server: http.Server;
         "http://localhost:3001",
         "http://localhost:3002",
         "http://localhost:5000",
-        "https://e8e61abdbe2e.ngrok-free.app",
+        "https://wmms-frontend.onrender.com",
       ],
       credentials: true,
       methods: ["GET", "POST"],
