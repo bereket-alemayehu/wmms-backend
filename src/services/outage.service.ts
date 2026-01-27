@@ -3,6 +3,7 @@ import Ticket from "../models/ticket.model";
 import Outage from "../models/outage.model";
 import Office from "../models/office.model";
 import User from "../models/user.model";
+import { notifyOutageCreated } from "./notification.service";
 
 /**
  * Detects mass connectivity issues and automatically creates an outage record
@@ -55,7 +56,7 @@ export const detectAndCreateOutage = async (officeId: string | Types.ObjectId): 
             }
 
             // Create new outage
-            await Outage.create({
+            const newOutage = await Outage.create({
                 officeId: id,
                 postedBy: manager._id,
                 title: "Mass Connectivity Issue Detected",
@@ -63,6 +64,10 @@ export const detectAndCreateOutage = async (officeId: string | Types.ObjectId): 
                 affectedAreas: [office.location],
                 status: "Active",
             });
+
+            // Notify all users in the office
+            const io = globalThis.io;
+            await notifyOutageCreated(id, newOutage._id, newOutage.title, io);
 
             console.log(`[Outage Detection] Successfully created Mass Outage for ${office.branchName}`);
         }
